@@ -121,4 +121,14 @@ def test_health(client):
     h = client.get("/api/health").json()
     assert h["components"]["database"]["ok"] is True
     assert h["components"]["slack"]["ok"] is False
-    assert h["required_checks"] == ["helm-validate"]
+    assert h["repositories"] == ["acme/demo"]
+
+
+def test_unconfigured_repository_is_rejected(client):
+    assert client.post("/api/tasks/register", json={"repo": "acme/other", "pr_number": 1}).status_code == 403
+
+
+def test_config_endpoint(client):
+    cfg = client.get("/api/config").json()
+    route = cfg["repositories"][0]["routes"][0]
+    assert route["check"] == "helm-validate" and route["remediation_agent"] == "k8s-remediator"

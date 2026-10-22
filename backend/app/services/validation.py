@@ -1,4 +1,4 @@
-"""Local deterministic validation — runs the trusted copy of tools/chart_validator against a worktree."""
+"""Local deterministic validation — runs the route's trusted validator (from the control plane) on a worktree."""
 
 from __future__ import annotations
 
@@ -7,29 +7,16 @@ import os
 from pathlib import Path
 
 from app.config import get_settings
+from app.control_plane import Route
 from app.services import proc
 
 
-def chart_dirs(worktree: Path, changed_paths: list[str]) -> list[str]:
-    """Charts touched by the PR (relative to the worktree), defaulting to every chart under demo/charts."""
-    dirs: set[str] = set()
-    for p in changed_paths:
-        cur = (worktree / p).parent
-        while cur != worktree and worktree in cur.parents:
-            if (cur / "Chart.yaml").exists():
-                dirs.add(str(cur.relative_to(worktree)))
-                break
-            cur = cur.parent
-    if not dirs and (worktree / "demo" / "charts").exists():
-        dirs.add("demo/charts")
-    return sorted(dirs)
-
-
-async def validate(worktree: Path, charts: list[str]) -> dict:
+async def validate(worktree: Path, route: Route) -> dict:
+    """Run the route's validator on its scan roots inside the worktree. Contract: `--format json` report."""
     s = get_settings()
     env = {**os.environ, "KUBECONFORM_CACHE": str(s.data_dir / "kubeconform-cache")}
     res = await proc.run(
-        [s.validator_python, str(s.validator_script), *charts, "--format", "json"],
+        [s.validator_python, str(route.validator_path), *route.scan_roots, "--format", "json"],
         cwd=worktree, timeout=s.validator_timeout_seconds, env=env,
     )
     try:
@@ -42,4 +29,6 @@ async def validate(worktree: Path, charts: list[str]) -> dict:
 
 
 def findings_of(report: dict) -> list[dict]:
-    return [f for c in report.get("charts", []) for f in c.get("findings", [])]
+    """Findings from a validator report; `charts` (Helm) and the generic `targets` key are both accepted."""
+    groups = report.get("charts") or report.get("targets") or []
+    return [f for g in groups for f in g.get("findings", [])]

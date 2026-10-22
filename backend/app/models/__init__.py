@@ -77,6 +77,7 @@ class Task(Base):
     head_sha: Mapped[str] = mapped_column(String(64))  # latest known head of the PR branch
     expected_sha: Mapped[str] = mapped_column(String(64))  # commit whose CI result we act on
     source: Mapped[str] = mapped_column(String(32), default="api")
+    route: Mapped[str | None] = mapped_column(String(200))  # check name selecting skill/agent in control-plane.yaml
 
     state: Mapped[str] = mapped_column(String(32), default=TaskState.NEW, index=True)
     pending_action: Mapped[str | None] = mapped_column(String(32))

@@ -68,12 +68,12 @@ backend/                FastAPI app, worker, SQLAlchemy models, Alembic migratio
   app/agents/           analysis & remediation contracts (schemas, prompts, reconciliation, scope)
   app/integrations/     GitHub REST, git worktrees, headless Claude runner, Slack
 frontend/               React + TypeScript + Vite + Tailwind dashboard
-tools/chart_validator/  deterministic validator — used by CI, the backend and the agent
+control-plane.yaml      repositories and routes: failed check → skill, agent, validator, allowed paths
 demo/charts/            payments-api Helm chart
 demo/scenarios/         scenario definitions A/B/C
 demo/scripts/           scenario.py (prepare/verify), agent_dry_run.py (rehearsal)
 .claude/hooks/          register_pr.py — PostToolUse hook
-.claude/skills/         k8s-failure-analysis — Analysis Skill
+.claude/skills/         k8s-failure-analysis — Analysis Skill (+ scripts/validate.py, the validator)
 .claude/agents/         k8s-remediator — Remediation Subagent
 .github/workflows/      helm-validate (required check), ci (tests)
 scripts/preflight.py    environment & integration preflight
@@ -115,19 +115,32 @@ The container cannot reach the macOS keychain, so it needs an explicit Claude cr
 | Claude Code | `claude` logged in (OAuth), or `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` | headless analysis and remediation |
 | Slack | an [Incoming Webhook](https://api.slack.com/messaging/webhooks) URL in `SLACK_WEBHOOK_URL` | success / review / failure notifications |
 
-All variables are documented in [`.env.example`](.env.example). Key ones:
+Repositories and routes live in [`control-plane.yaml`](control-plane.yaml) — which repository is watched, and for each
+failing CI check which skill, agent and validator handle it and which paths a fix may touch:
+
+```yaml
+repositories:
+  - repo: brinops/ai-workshop
+    routes:
+      - check: helm-validate
+        analysis_skill: k8s-failure-analysis
+        remediation_agent: k8s-remediator
+        validator: .claude/skills/k8s-failure-analysis/scripts/validate.py
+        allowed_paths: ["demo/charts/**"]
+```
+
+Skills and agents use the standard `.claude/` layout; adding a domain (e.g. Terraform) means adding a skill, an
+agent and a route — no code changes. See [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md#adding-a-domain-eg-terraform).
+
+Runtime settings and secrets are environment variables, documented in [`.env.example`](.env.example). Key ones:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REQUIRED_CHECKS` | `["helm-validate"]` | check runs that must succeed on the exact SHA |
-| `REMEDIATION_ALLOWED_PATHS` | `["demo/charts/**"]` | the only paths the agent may edit / the diff may touch |
-| `MAX_REMEDIATION_ATTEMPTS` | `2` | bounded fix → CI → re-analyze loops |
 | `CLAUDE_MODEL` | `sonnet` | model for both agents |
 | `AGENT_MAX_BUDGET_USD` | `2.0` | per-run spend cap (`--max-budget-usd`) |
 | `DEFAULT_AUTO_PUSH` | `false` | safe default: pushing requires approval |
 | `RCP_API_TOKEN` | — | optional bearer token for `/api/tasks/register` |
 | `GITHUB_WEBHOOK_SECRET` | — | enables `/api/webhooks/github` |
-| `ALLOWED_REPOS` | `[]` | restrict which repositories can be registered |
 
 ### Hook installation
 

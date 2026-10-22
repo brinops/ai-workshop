@@ -20,6 +20,10 @@ export function useEvents(limit = 50) {
   return useQuery({ queryKey: ["events", limit], queryFn: () => api.events(limit), refetchInterval: 30_000 });
 }
 
+export function useConfig() {
+  return useQuery({ queryKey: ["config"], queryFn: api.config, staleTime: 60_000 });
+}
+
 export function useHealth() {
   return useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 10_000 });
 }

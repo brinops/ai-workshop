@@ -29,6 +29,7 @@ from app.api.schemas import (
     ValidationRunOut,
 )
 from app.config import get_settings
+from app.control_plane import config_path, get_config
 from app.db import get_db, utcnow
 from app.integrations.github import GitHubClient, GitHubError, pr_info_from_payload, verify_webhook_signature
 from app.models import (
@@ -71,9 +72,8 @@ def _check_token(authorization: str | None) -> None:
 
 
 def _check_repo(repo: str) -> None:
-    allowed = get_settings().allowed_repos
-    if allowed and repo not in allowed:
-        raise HTTPException(403, f"repository {repo} is not in ALLOWED_REPOS")
+    if get_config().repository(repo) is None:
+        raise HTTPException(403, f"repository {repo} is not configured in control-plane.yaml")
 
 
 # ---------------------------------------------------------------- registration
@@ -227,8 +227,12 @@ def health(db: Session = Depends(get_db)) -> dict:
         "ok": all(c["ok"] for k, c in components.items() if k in ("database", "worker")),
         "components": components,
         "agents_running": running,
-        "required_checks": s.required_checks,
-        "allowed_paths": s.remediation_allowed_paths,
+        "repositories": [r.repo for r in get_config().repositories],
         "model": s.claude_model,
-        "max_attempts": s.max_remediation_attempts,
     }
+
+
+@router.get("/config")
+def control_plane_config() -> dict:
+    """The active control-plane.yaml (repositories → routes). Contains no secrets."""
+    return {"path": str(config_path()), **get_config().model_dump()}

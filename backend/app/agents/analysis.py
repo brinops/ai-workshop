@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fnmatch
 import json
 from pathlib import Path
 from typing import Literal
@@ -10,6 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
+from app.control_plane import Route
 from app.models import Classification
 
 REMEDIABLE = {Classification.SYNTAX_ERROR, Classification.SCHEMA_VIOLATION,
@@ -76,18 +76,14 @@ def deterministic_category(findings: list[dict]) -> Classification | None:
     return None
 
 
-def in_scope(path: str) -> bool:
-    return any(fnmatch.fnmatch(path, pat) for pat in get_settings().remediation_allowed_paths)
-
-
-def reconcile(out: AnalysisOutput, findings: list[dict]) -> Reconciled:
+def reconcile(out: AnalysisOutput, findings: list[dict], route: Route) -> Reconciled:
     """Deterministic CI evidence overrides the LLM's classification; the LLM supplies root cause and plan."""
     s = get_settings()
     det = deterministic_category(findings)
     final = det or out.classification
     agreement = None if det is None else det == out.classification
-    out_of_scope = sorted({f.path for f in out.affected_files if not in_scope(f.path)}
-                          | {c.file for c in out.proposed_fix.changes if not in_scope(c.file)})
+    out_of_scope = sorted({f.path for f in out.affected_files if not route.in_scope(f.path)}
+                          | {c.file for c in out.proposed_fix.changes if not route.in_scope(c.file)})
 
     reasons = []
     if final not in REMEDIABLE:
@@ -140,8 +136,8 @@ def render_markdown(out: AnalysisOutput, rec: Reconciled, findings: list[dict]) 
     return "\n".join(lines)
 
 
-def build_prompt(bundle_dir: Path, worktree: Path) -> str:
-    return f"""Use the `k8s-failure-analysis` skill to diagnose a failed configuration-validation check on a pull request.
+def build_prompt(bundle_dir: Path, worktree: Path, skill: str) -> str:
+    return f"""Use the `{skill}` skill to diagnose a failed configuration-validation check on a pull request.
 
 Inputs (read them with the Read tool):
 - {bundle_dir}/context.json   — PR metadata, changed files, failed checks, deterministic validator findings

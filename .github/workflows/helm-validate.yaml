@@ -10,7 +10,7 @@ on:
     branches: [main]
     paths:
       - "demo/charts/**"
-      - "tools/chart_validator/**"
+      - ".claude/skills/k8s-failure-analysis/scripts/**"
 
 permissions:
   contents: read
@@ -49,4 +49,4 @@ jobs:
       - name: Validate charts (YAML, helm lint, helm template, kubeconform, consistency)
         env:
           KUBECONFORM_CACHE: ${{ runner.temp }}/kubeconform-cache
-        run: python tools/chart_validator/validate.py demo/charts --format github
+        run: python .claude/skills/k8s-failure-analysis/scripts/validate.py demo/charts --format github

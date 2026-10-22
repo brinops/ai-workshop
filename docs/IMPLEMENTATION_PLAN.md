@@ -33,7 +33,7 @@ Hook, GitHub client (PR, check-runs, job logs, annotations), worktree manager, C
 process group, timeout, cancellation), analysis skill + reconciliation, remediation subagent + scope check, push.
 
 ## Phase 4 — Validation + Slack
-`tools/chart_validator` (YAML parse, helm lint, helm template, kubeconform, consistency checks),
+the chart validator, now `.claude/skills/k8s-failure-analysis/scripts/validate.py` (YAML parse, helm lint, helm template, kubeconform, consistency checks),
 `.github/workflows/helm-validate.yaml`, Slack Block Kit notifications with persisted delivery status.
 
 ## Phase 5 — Workshop

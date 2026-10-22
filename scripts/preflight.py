@@ -98,6 +98,16 @@ def main() -> int:
     else:
         check("Claude Code headless auth", True, "skipped (use --live)", required=False)
 
+    # --- control-plane.yaml (repositories, routes; every skill/agent/validator must exist)
+    py_bin = ROOT / "backend" / ".venv" / "bin" / "python"
+    if py_bin.exists():
+        r = sh(str(py_bin), "-c", "from app.control_plane import load; c = load(); "
+               "print('; '.join(f'{x.repo}: ' + ', '.join(f'{r.check} → {r.remediation_agent}' for r in x.routes) "
+               "for x in c.repositories))", cwd=ROOT / "backend")
+        check("control-plane.yaml", r.returncode == 0, (r.stdout.strip() or r.stderr.strip().splitlines()[-1])[:160])
+        if repo and r.returncode == 0:
+            check("repository is configured", repo.lower() in r.stdout.lower(), repo)
+
     # --- validator + scenarios
     py = ROOT / "backend" / ".venv" / "bin" / "python"
     if py.exists():

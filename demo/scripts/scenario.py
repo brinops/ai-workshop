@@ -28,7 +28,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIOS = ROOT / "demo" / "scenarios"
-VALIDATOR = ROOT / "tools" / "chart_validator" / "validate.py"
+VALIDATOR = ROOT / ".claude" / "skills" / "k8s-failure-analysis" / "scripts" / "validate.py"
 
 
 def load(scenario_id: str) -> dict:

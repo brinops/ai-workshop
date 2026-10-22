@@ -5,7 +5,8 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
-      - "tools/**"
+      - ".claude/skills/**"
+      - "control-plane.yaml"
       - ".claude/hooks/**"
       - ".github/workflows/ci.yaml"
 
@@ -28,7 +29,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Lint
         working-directory: backend
-        run: uv run --python 3.12 ruff check app tests ../.claude/hooks ../tools ../demo/scripts ../scripts
+        run: uv run --python 3.12 ruff check app tests ../.claude/hooks ../.claude/skills ../demo/scripts ../scripts
       - name: Test
         working-directory: backend
         run: uv run --python 3.12 pytest -q

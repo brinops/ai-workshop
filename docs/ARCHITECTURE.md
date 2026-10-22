@@ -21,7 +21,7 @@ flowchart LR
         WORKER -- "check-runs / job logs" --> GHAPI[GitHub REST API]
         WORKER -- "claude -p + skill" --> ANALYZE[Analysis Skill<br/>k8s-failure-analysis]
         WORKER -- "claude -p --agent" --> REMEDIATE[Remediation Subagent<br/>k8s-remediator]
-        WORKER -- "subprocess" --> VALIDATOR[tools/chart_validator]
+        WORKER -- "subprocess" --> VALIDATOR[skill validator script]
         WORKER -- "git push (fast-forward only)" --> GH
         WORKER -- "Incoming Webhook" --> SLACK[(Slack)]
     end
@@ -38,7 +38,8 @@ flowchart LR
 | Orchestration | `backend/app/orchestration/` | State machine, worker loop, stage handlers, leases, recovery |
 | Integrations | `backend/app/integrations/` | GitHub REST client, git worktree manager, Slack client, Claude CLI runner |
 | Agents | `backend/app/agents/` | Prompt construction, output schemas, deterministic reconciliation |
-| Validator | `tools/chart_validator/` | Single source of truth for validation — used by CI, the backend and the agent |
+| Validator | `.claude/skills/<skill>/scripts/validate.py` | Single source of truth for validation — used by CI, the backend and the agent |
+| Routing config | `control-plane.yaml` | Repositories and routes: failed CI check → skill, agent, validator, allowed paths |
 | Analysis Skill | `.claude/skills/k8s-failure-analysis/` | Classify failure + root cause + fix plan (read-only tools) |
 | Remediation Subagent | `.claude/agents/k8s-remediator.md` | Apply the minimal fix in an isolated worktree (edit-only, allowlisted paths) |
 | UI | `frontend/` | Kanban, task detail, timeline, diff, logs, controls, presentation mode |
@@ -102,7 +103,7 @@ Kanban mapping:
 | Agent configuration | Skills/agents are loaded from the **operator's checkout** (`cwd` = control-plane repo), never from the PR worktree — a PR cannot change the agent's instructions |
 | Analysis tools | `Read, Grep, Glob` only, `--permission-mode dontAsk` (anything not allowlisted is denied) |
 | Remediation tools | `Read, Grep, Glob, Edit` limited to `Edit(//<worktree>/demo/charts/**)` + the validator command; **no git, no network, no shell** |
-| Scope enforcement | The backend re-checks the produced diff: only `REMEDIATION_ALLOWED_PATHS` globs, ≤ `REMEDIATION_MAX_CHANGED_LINES`; otherwise NEEDS_REVIEW |
+| Scope enforcement | The backend re-checks the produced diff: only the route's `allowed_paths` globs, ≤ `max_changed_lines` (`control-plane.yaml`); otherwise NEEDS_REVIEW |
 | Git | Only the backend commits and pushes; fast-forward push of `HEAD:refs/heads/<pr-branch>` after verifying the remote head equals the expected SHA; protected branches are refused; **never merges** |
 | Secrets | Not stored in hook config or DB; redaction filter on all logs/events/Slack payloads; `.env` git-ignored |
 | Inbound | Hook endpoint optionally requires `RCP_API_TOKEN`; GitHub webhook requires HMAC (`GITHUB_WEBHOOK_SECRET`) |
@@ -110,7 +111,7 @@ Kanban mapping:
 
 ## 6. Determinism over LLM opinion
 
-`tools/chart_validator` emits machine-readable findings (`RCP-FINDING {json}` lines in CI logs, GitHub annotations,
+The route's validator (`.claude/skills/k8s-failure-analysis/scripts/validate.py`) emits machine-readable findings (`RCP-FINDING {json}` lines in CI logs, GitHub annotations,
 JSON locally) with a category: `SYNTAX_ERROR`, `SCHEMA_VIOLATION`, `LOGICAL_CONFIGURATION_ERROR`.
 The backend extracts these from the real job log **before** invoking the agent and passes them as evidence.
 After analysis, `reconcile()` enforces: if deterministic evidence exists and the LLM disagrees,

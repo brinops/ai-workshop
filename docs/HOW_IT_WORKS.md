@@ -13,7 +13,8 @@ worker decides what to do next purely by reading those rows.
 | **Worker (orchestrator)** | Python loop in the backend, ticks every 2 s | Polls CI, launches agents, commits, pushes, changes states |
 | **Analysis Skill** | One headless `claude -p` run | Reads evidence files, returns a diagnosis as JSON. Read-only |
 | **Remediation Subagent** | One headless `claude -p --agent` run | Edits chart files in a worktree, returns a result as JSON |
-| **Validator** | `tools/chart_validator/validate.py` | Deterministic checks — same code in CI, backend and agent |
+| **Validator** | `.claude/skills/k8s-failure-analysis/scripts/validate.py` | Deterministic checks — same code in CI, backend and agent |
+| **`control-plane.yaml`** | Routing config | Which repos are watched; failed check → skill, agent, validator, allowed paths |
 | **SQLite** | `var/rcp.db` | The single source of truth: task state, events, logs |
 | **Dashboard** | React | Only *displays* DB rows (live via SSE); buttons only change DB fields |
 
@@ -68,7 +69,8 @@ A second registration of the same PR does not create a row (`UNIQUE(repo, pr_num
 ### 2. Waiting for CI — `WAITING_CI`
 
 Every 15 s the worker selects tasks in `WAITING_CI` and asks GitHub for the check runs of
-**exactly `expected_sha`**. It writes:
+**exactly `expected_sha`**. The checks that count are the `check` names of the repository's routes in
+`control-plane.yaml`. It writes:
 
 - `ci_snapshots`: a snapshot whenever the check states change;
 - `tasks.ci_status`: `pending` / `failure` / `success` / `cancelled` / `skipped`.
@@ -78,7 +80,7 @@ Then the worker decides — **no agent involved**:
 | CI result | Next |
 |---|---|
 | `success` | `DONE` (`passed_without_remediation`) — no agent ever runs |
-| `failure`, Auto Analyze on | `ANALYZING` |
+| `failure`, Auto Analyze on | `ANALYZING` — the failed check selects the **route** (stored in `tasks.route`) |
 | `failure`, Auto Analyze off | stays `WAITING_CI` with `pending_action=analyze` → waits for **Analyze Now** |
 | `cancelled` / `skipped` / timeout | `NEEDS_REVIEW` (cannot prove validity) |
 
@@ -120,7 +122,7 @@ With Auto Remediate on, the worker moves the task to `IN_PROGRESS` and consumes 
    `<worktree>/demo/charts/**`, and exactly one Bash command — the trusted validator. No git, no network.
 4. **Deterministic post-checks by the worker** (whatever the agent claims):
    - compute the diff;
-   - scope check: only `REMEDIATION_ALLOWED_PATHS`, no deletions, ≤ 40 changed lines;
+   - scope check: only the route's `allowed_paths`, no deletions, ≤ `max_changed_lines`;
    - run the validator again → `validation_runs` (`post-remediation`);
    - if everything passes → `git commit` (author "RCP Remediation Agent").
 5. Written: `remediations` (diff, files, `scope_ok`, validation report, `commit_sha`,
@@ -188,62 +190,73 @@ sqlite3 var/rcp.db "select kind,status,num_turns,cost_usd from agent_runs where 
 
 ---
 
-## Why does it "know" it is Helm? (and how to add Terraform)
+## How does it "know" it is Helm? — `control-plane.yaml`
 
-### Today: Helm is wired explicitly, not discovered
+Nothing domain-specific is hard-coded in the backend. Domain knowledge lives in the standard `.claude/` layout,
+and `control-plane.yaml` only wires it together:
 
-The headless pipeline **does not pick skills or agents by their description**. Descriptions matter for
-*interactive* Claude Code sessions, where the model chooses a skill itself. Here the worker names everything
-explicitly:
+```text
+control-plane.yaml                                    repos → routes
+.claude/skills/k8s-failure-analysis/SKILL.md          Analysis Skill
+.claude/skills/k8s-failure-analysis/scripts/validate.py   validator (CI, backend and agent run this)
+.claude/agents/k8s-remediator.md                      Remediation Subagent
+```
 
-| What | Where | Value today |
-|---|---|---|
-| Which analysis skill | `backend/app/agents/analysis.py` → `build_prompt()` | prompt says "Use the `k8s-failure-analysis` skill" |
-| Which remediation agent | `backend/app/agents/remediation.py` → `AGENT_NAME` | `k8s-remediator` (passed as `--agent`) |
-| Which validator | `backend/app/config.py` → `validator_script` | `tools/chart_validator/validate.py` |
-| Which CI check counts | `REQUIRED_CHECKS` | `["helm-validate"]` |
-| Which files may be edited | `REMEDIATION_ALLOWED_PATHS` | `["demo/charts/**"]` |
-| How targets are found | `backend/app/services/validation.py` → `chart_dirs()` | directories containing `Chart.yaml` |
-| Skill / agent definitions | `.claude/skills/k8s-failure-analysis/SKILL.md`, `.claude/agents/k8s-remediator.md` | copied into a clean agent home before each run |
+```yaml
+repositories:
+  - repo: brinops/ai-workshop
+    protected_branches: [main, master, "release/*", production]
+    routes:
+      - check: helm-validate                 # name of the CI check run
+        analysis_skill: k8s-failure-analysis
+        remediation_agent: k8s-remediator
+        validator: .claude/skills/k8s-failure-analysis/scripts/validate.py
+        allowed_paths: ["demo/charts/**"]
+        max_changed_lines: 40
+        max_attempts: 2
+```
 
-So "it is Helm" because every task goes through that one hard-wired profile: one CI check, one validator,
-one skill, one agent.
+How a task is routed:
 
-### Adding Terraform — what would be needed
+1. Only repositories listed in the file can be registered (others get HTTP 403).
+2. The repository's route `check` names are its **required checks**.
+3. When one of them fails, that check selects the route → `tasks.route` (event `route_selected`).
+4. Every stage then uses the route: the skill named in the analysis prompt, `--agent <remediation_agent>`,
+   the validator for local validation and as the agent's only allowed command, `allowed_paths` for the
+   agent's `Edit` permission **and** for the backend's scope check on the diff, `max_changed_lines`,
+   `max_attempts`, and the repository's `protected_branches`.
+5. A task whose route is missing (config changed, repo removed) goes to `NEEDS_REVIEW` — it is never guessed.
 
-1. **Deterministic validator** (the most important part): e.g. `tools/tf_validator/validate.py` running
-   `terraform fmt -check`, `terraform validate`, `tflint` (and optionally `checkov`), printing the same
-   `RCP-FINDING {json}` lines with a category (`SYNTAX_ERROR`, `SCHEMA_VIOLATION`, …).
-2. **CI workflow** `.github/workflows/terraform-validate.yaml` with a check run named, e.g., `terraform-validate`.
-3. **Skill** `.claude/skills/terraform-failure-analysis/SKILL.md` — same output contract, Terraform know-how.
-4. **Agent** `.claude/agents/terraform-remediator.md` — same rules, Terraform files.
-5. **Routing in the backend** — this is the part that does not exist yet. The clean way is a *profile
-   registry* instead of the single hard-wired profile:
+The file is validated at startup (Pydantic schema + every skill, agent and validator must exist); a broken
+config stops the service with a clear error. `GET /api/config` shows the active configuration.
 
-   ```python
-   PROFILES = [
-       Profile(name="helm",
-               required_checks=["helm-validate"],
-               detect=["**/Chart.yaml", "**/values*.yaml", "**/templates/**"],
-               allowed_paths=["demo/charts/**"],
-               validator=["tools/chart_validator/validate.py"],
-               skill="k8s-failure-analysis",
-               agent="k8s-remediator"),
-       Profile(name="terraform",
-               required_checks=["terraform-validate"],
-               detect=["**/*.tf", "**/*.tfvars"],
-               allowed_paths=["infra/**"],
-               validator=["tools/tf_validator/validate.py"],
-               skill="terraform-failure-analysis",
-               agent="terraform-remediator"),
-   ]
+### Why routing is not left to skill/agent descriptions
+
+Descriptions are for *interactive* Claude Code, where the model picks a skill itself. Here the route is chosen
+by the failed check name — deterministically — because a prompt-injected PR must not be able to steer the
+pipeline to a different agent. For the same reason `allowed_paths` is in the config, not in the agent file: it
+is the boundary the backend enforces on the agent's output, so the agent cannot declare its own permissions.
+
+### Adding a domain (e.g. Terraform)
+
+1. `.claude/skills/terraform-failure-analysis/SKILL.md` — how to diagnose Terraform failures, same JSON
+   output contract.
+2. `.claude/skills/terraform-failure-analysis/scripts/validate.py` — runs e.g. `terraform fmt -check`,
+   `terraform validate`, `tflint`; prints `RCP-FINDING {json}` lines with a `category`; supports
+   `--format json` (report `{valid, charts|targets: [{findings: [...]}]}`); exit 1 on findings.
+3. `.claude/agents/terraform-remediator.md` — the fixing agent.
+4. A CI job named `terraform-validate` that runs the same validator with `--format github`.
+5. A route in `control-plane.yaml`:
+
+   ```yaml
+       routes:
+         - check: terraform-validate
+           analysis_skill: terraform-failure-analysis
+           remediation_agent: terraform-remediator
+           validator: .claude/skills/terraform-failure-analysis/scripts/validate.py
+           allowed_paths: ["infra/**"]
    ```
 
-   The worker would choose the profile **deterministically** — from *which required check failed* (most
-   reliable) and *which files the PR changed* — store it on the task (`tasks.profile`), and then use that
-   profile's skill, agent, validator, allowed paths and checks for every stage. A PR touching both Helm and
-   Terraform would get the profile of the check that failed.
-
-Routing stays deterministic on purpose: the LLM is not asked "which skill should I use?", because a
-prompt-injected PR must not be able to steer the pipeline to a different agent or a wider set of
-editable paths.
+No backend code changes. The skills and agents are always loaded from the control plane's own checkout
+(copied into a clean agent home before each run), never from the PR being analysed — otherwise a PR could
+rewrite the instructions of the agent that reviews it.
