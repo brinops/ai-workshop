@@ -1,5 +1,7 @@
-# docker compose up --build    → http://localhost:8000
+# docker compose up --build    → http://127.0.0.1:${PORT:-8000}
 # Requires in .env: GITHUB_TOKEN, SLACK_WEBHOOK_URL and ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN.
+# RCP_BIND=0.0.0.0 exposes the dashboard on the LAN — it has no login, so only on trusted networks.
+# RCP_DATA=./var reuses the local SQLite history instead of the named volume.
 services:
   control-plane:
     build: .
@@ -7,11 +9,12 @@ services:
     environment:
       DATA_DIR: /data
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8000}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}   # pass from the shell, e.g. GITHUB_TOKEN=$(gh auth token)
       CORS_ORIGINS: '["http://localhost:8000"]'
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${RCP_BIND:-127.0.0.1}:${PORT:-8000}:8000"
     volumes:
-      - rcp-data:/data
+      - ${RCP_DATA:-rcp-data}:/data
     stop_grace_period: 40s   # lets the worker stop agents and release leases
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
