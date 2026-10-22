@@ -32,9 +32,6 @@ class Settings(BaseSettings):
     github_api_url: str = "https://api.github.com"
     github_webhook_secret: str | None = None
     git_remote_template: str = "git@github.com:{repo}.git"
-    allowed_repos: list[str] = []  # empty = any repo the token can access
-    required_checks: list[str] = ["helm-validate"]  # empty = every check run on the commit
-    protected_branches: list[str] = ["main", "master", "release/*", "production"]
     ci_poll_interval_seconds: int = 15
     ci_wait_timeout_seconds: int = 1200
     git_author_name: str = "RCP Remediation Agent"
@@ -50,10 +47,8 @@ class Settings(BaseSettings):
     analysis_max_runs: int = 2  # agent crashes tolerated per analysis stage
     min_confidence_for_auto_fix: float = 0.6
 
-    # --- remediation scope
-    remediation_allowed_paths: list[str] = ["demo/charts/**"]
-    remediation_max_changed_lines: int = 40
-    max_remediation_attempts: int = 2
+    # --- repositories, routes (check → skill / agent / validator / allowed paths)
+    control_plane_config: str = "control-plane.yaml"  # relative to the repository root
 
     # --- validation
     validator_python: str = sys.executable
@@ -77,10 +72,6 @@ class Settings(BaseSettings):
     @property
     def db_url(self) -> str:
         return self.database_url or f"sqlite:///{self.data_dir / 'rcp.db'}"
-
-    @property
-    def validator_script(self) -> Path:
-        return REPO_ROOT / "tools" / "chart_validator" / "validate.py"
 
     @property
     def claude_path(self) -> str | None:

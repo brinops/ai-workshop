@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import routes, stream
 from app.config import REPO_ROOT, get_settings
+from app.control_plane import get_config
 from app.db import init_engine, run_migrations
 from app.orchestration.worker import Worker
 
@@ -24,6 +25,8 @@ DIST = REPO_ROOT / "frontend" / "dist"
 async def lifespan(app: FastAPI):
     s = get_settings()
     logging.basicConfig(level=s.log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    cfg = get_config()  # fail fast on a broken control-plane.yaml
+    log.info("control-plane.yaml: %s", ", ".join(f"{r.repo} ({len(r.routes)} route(s))" for r in cfg.repositories))
     run_migrations()
     init_engine()
     worker_job = None

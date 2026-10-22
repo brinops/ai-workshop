@@ -16,6 +16,7 @@ const base: TaskCard = {
   head_sha: "abcdef1234567890",
   expected_sha: "abcdef1234567890",
   source: "hook",
+  route: "helm-validate",
   state: "IN_PROGRESS",
   column: "IN_PROGRESS",
   pending_action: null,

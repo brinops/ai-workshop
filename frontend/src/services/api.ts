@@ -48,6 +48,8 @@ export interface TaskCard {
   head_sha: string;
   expected_sha: string;
   source: string;
+  /** control-plane.yaml route (failed CI check name) handling this task. */
+  route: string | null;
   state: TaskState;
   column: ColumnId;
   pending_action: PendingAction | string | null;
@@ -120,7 +122,7 @@ export interface LogLineOut {
   detail: string | null;
 }
 
-/** Report produced by tools/chart_validator/validate.py (`--format json`). */
+/** Report produced by a route's validator (e.g. .claude/skills/k8s-failure-analysis/scripts/validate.py --format json). */
 export interface ValidatorFinding {
   category: string;
   check: string;
@@ -346,6 +348,23 @@ export const api = {
     request<Automation>("/api/settings/automation", { method: "PUT", body: JSON.stringify(patch) }),
   health: () => request<Health>("/api/health"),
   events: (limit = 50) => request<EventOut[]>(`/api/events?limit=${limit}`),
+  config: () => request<ControlPlaneConfig>("/api/config"),
 };
 
 export const STREAM_URL = "/api/stream";
+
+/** One route of control-plane.yaml: failed check → skill, agent, validator, editable paths. */
+export interface Route {
+  check: string;
+  analysis_skill: string;
+  remediation_agent: string;
+  validator: string;
+  allowed_paths: string[];
+  max_changed_lines: number;
+  max_attempts: number;
+}
+
+export interface ControlPlaneConfig {
+  path: string;
+  repositories: { repo: string; protected_branches: string[]; routes: Route[] }[];
+}

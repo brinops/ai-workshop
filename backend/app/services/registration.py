@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db import utcnow
 from app.models import Remediation, Task, TaskState
 from app.orchestration.state_machine import transition
@@ -60,7 +59,6 @@ def register_pr(db: Session, pr: PRInfo, source: str) -> RegistrationResult:
             expected_sha=pr.head_sha,
             source=source,
             state=TaskState.NEW,
-            max_attempts=get_settings().max_remediation_attempts,
         )
         try:
             with db.begin_nested():

@@ -8,6 +8,7 @@ import pytest
 
 from app import db as dbmod
 from app.config import Settings, get_settings
+from app.control_plane import get_config
 from app.integrations.claude_runner import AgentResult
 from app.integrations.git_worktree import ChangedFile
 from app.integrations.github import CheckRun, resolve_token
@@ -26,13 +27,37 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("RUN_WORKER", "false")
     monkeypatch.setenv("CI_POLL_INTERVAL_SECONDS", "0")
     monkeypatch.setenv("HEARTBEAT_SECONDS", "1")
+    cfg = tmp_path / "control-plane.yaml"
+    cfg.write_text(TEST_CONFIG)
+    monkeypatch.setenv("CONTROL_PLANE_CONFIG", str(cfg))
     get_settings.cache_clear()
+    get_config.cache_clear()
     resolve_token.cache_clear()
     dbmod.run_migrations()
     dbmod.init_engine()
     yield
     get_settings.cache_clear()
+    get_config.cache_clear()
     resolve_token.cache_clear()
+
+
+TEST_CONFIG = """
+repositories:
+  - repo: acme/demo
+    protected_branches: [main, "release/*"]
+    routes:
+      - check: helm-validate
+        analysis_skill: k8s-failure-analysis
+        remediation_agent: k8s-remediator
+        validator: .claude/skills/k8s-failure-analysis/scripts/validate.py
+        allowed_paths: ["demo/charts/**"]
+        max_changed_lines: 40
+        max_attempts: 2
+"""
+
+
+def helm_route():
+    return get_config().repository("acme/demo").route("helm-validate")
 
 
 SHA1 = "a" * 40
@@ -114,7 +139,8 @@ class FakeWorktrees:
     async def commit(self, wt, message):
         return self.commit_sha
 
-    async def push(self, wt, branch):
+    async def push(self, wt, branch, protected):
+        assert branch not in protected
         self.pushes.append((str(wt), branch))
         if self.github:
             self.github.pr_head = self.commit_sha
@@ -184,7 +210,7 @@ def harness(tmp_path) -> Harness:
     slack_calls: list = []
     validate_results: list = []
 
-    async def fake_validate(worktree, charts):
+    async def fake_validate(worktree, route):
         if validate_results:
             return validate_results.pop(0)
         return {"valid": True, "charts": [], "exit_code": 0}

@@ -27,8 +27,8 @@ class ChangedFile:
     removed: int
 
 
-def is_protected(branch: str) -> bool:
-    return any(fnmatch.fnmatch(branch, pat) for pat in get_settings().protected_branches)
+def is_protected(branch: str, patterns: list[str]) -> bool:
+    return any(fnmatch.fnmatch(branch, pat) for pat in patterns)
 
 
 class WorktreeManager:
@@ -116,8 +116,8 @@ class WorktreeManager:
                         "commit", "--no-verify", "-m", message, cwd=worktree)
         return await self._git("rev-parse", "HEAD", cwd=worktree)
 
-    async def push(self, worktree: Path, branch: str) -> None:
+    async def push(self, worktree: Path, branch: str, protected: list[str]) -> None:
         """Fast-forward push of HEAD to the PR branch. Never forces, never touches protected branches."""
-        if is_protected(branch):
+        if is_protected(branch, protected):
             raise GitError(f"refusing to push to protected branch {branch!r}")
         await self._git("push", "--no-verify", "origin", f"HEAD:refs/heads/{branch}", cwd=worktree, timeout=180)

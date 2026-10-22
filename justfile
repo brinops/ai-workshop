@@ -40,12 +40,12 @@ test:
 
 # Lint everything
 lint:
-    cd backend && uv run ruff check app tests ../.claude/hooks ../tools ../demo/scripts ../scripts
+    cd backend && uv run ruff check app tests ../.claude/hooks ../.claude/skills ../demo/scripts ../scripts
     cd frontend && pnpm lint
 
 # Run the chart validator on demo/charts
 validate:
-    {{py}} tools/chart_validator/validate.py demo/charts
+    {{py}} .claude/skills/k8s-failure-analysis/scripts/validate.py demo/charts
 
 # Prove every scenario fails for its intended reason
 scenarios:

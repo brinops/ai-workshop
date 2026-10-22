@@ -1,4 +1,4 @@
-import { AlertTriangle, GitBranch, Hand, Rocket, Sparkles, Wrench } from "lucide-react";
+import { AlertTriangle, GitBranch, Hand, Rocket, Route, Sparkles, Wrench } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -90,6 +90,11 @@ export function TaskCardView({ task, now, selected }: { task: TaskCard; now: num
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <CIStatus status={task.ci_status} className="mr-1" />
         <ClassificationChip value={task.classification} />
+        {task.route && (
+          <Badge tone="neutral" title="control-plane.yaml route (failed CI check)">
+            <Route aria-hidden /> {task.route}
+          </Badge>
+        )}
         {task.attempt > 0 && (
           <Badge tone="neutral" title="Remediation attempts used">
             attempt {task.attempt}/{task.max_attempts}

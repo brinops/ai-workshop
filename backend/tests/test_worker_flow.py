@@ -203,6 +203,7 @@ async def test_recovery_after_interrupted_worker(harness):
     with session_scope() as db:
         t = db.get(Task, tid)
         t.state = TaskState.ANALYZING
+        t.route = "helm-validate"
         t.lease_owner = "dead-worker"
         t.lease_expires_at = utcnow() - timedelta(seconds=5)
         db.add(AgentRun(task_id=tid, kind="analysis", status="running", worker_id="dead-worker"))
@@ -262,3 +263,23 @@ async def test_graceful_shutdown_releases_leases(harness):
     assert t.lease_owner is None and t.state == TaskState.ANALYZING
     with session_scope() as db:
         assert db.scalar(select(AgentRun).where(AgentRun.task_id == tid)).status in ("interrupted", "cancelled")
+
+
+async def test_unrouted_task_goes_to_review_instead_of_guessing(harness):
+    tid = make_task()
+    with session_scope() as db:
+        t = db.get(Task, tid)
+        t.state = TaskState.ANALYZING
+        t.route = "terraform-validate"  # no such route in control-plane.yaml
+    await harness.drain(2)
+    t = task(tid)
+    assert t.state == TaskState.NEEDS_REVIEW and t.resolution == "not_configured"
+    assert harness.agents.calls == []
+
+
+async def test_failed_check_selects_route(harness):
+    tid = make_task(auto_analyze=False)
+    harness.github.set_check(SHA1, "completed", "failure")
+    await harness.drain(1)
+    t = task(tid)
+    assert t.route == "helm-validate" and t.max_attempts == 2

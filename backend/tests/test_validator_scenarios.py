@@ -11,7 +11,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "demo" / "scripts"))
-sys.path.insert(0, str(ROOT / "tools" / "chart_validator"))
+sys.path.insert(0, str(ROOT / ".claude" / "skills" / "k8s-failure-analysis" / "scripts"))
 
 import scenario  # noqa: E402
 import validate  # noqa: E402

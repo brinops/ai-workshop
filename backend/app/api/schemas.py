@@ -48,6 +48,7 @@ class TaskCard(_Out):
     head_sha: str
     expected_sha: str
     source: str
+    route: str | None
     state: str
     column: str
     pending_action: str | None

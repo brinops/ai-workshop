@@ -25,10 +25,11 @@ from sqlalchemy import and_, or_, select, update
 from app.agents import analysis as analysis_contract
 from app.agents import remediation as remediation_contract
 from app.config import get_settings
+from app.control_plane import ControlPlaneConfig, Repository, Route, get_config
 from app.db import session_scope, utcnow
 from app.integrations import claude_runner, slack
 from app.integrations.claude_runner import AgentResult, AgentSpec
-from app.integrations.git_worktree import GitError, WorktreeManager, is_protected
+from app.integrations.git_worktree import GitError, WorktreeManager
 from app.integrations.github import GitHubClient, GitHubError
 from app.models import (
     AgentLogLine,
@@ -62,7 +63,8 @@ class Deps:
     github: Callable[[], GitHubClient] = GitHubClient
     worktrees: WorktreeManager = field(default_factory=WorktreeManager)
     run_agent: AgentFn = claude_runner.run_agent
-    validate: Callable[[Path, list[str]], Awaitable[dict]] = local_validation.validate
+    validate: Callable[[Path, Route], Awaitable[dict]] = local_validation.validate
+    config: Callable[[], ControlPlaneConfig] = get_config
     slack_send: Callable[[dict], Awaitable[tuple[str, str | None]]] = slack.send
 
 
@@ -254,8 +256,12 @@ class Worker:
             if t is None:
                 return
             repo, sha, state = t.repo, t.expected_sha, S(t.state)
+            repo_cfg = self.deps.config().repository(repo)
+            if repo_cfg is None:
+                self._unconfigured(db, t)
+                return
         runs = await asyncio.to_thread(self.gh.list_check_runs, repo, sha)
-        result = aggregate(runs, self.settings.required_checks)
+        result = aggregate(runs, repo_cfg.required_checks)
         auto = None
         with session_scope() as db:
             t = db.get(Task, task_id)
@@ -282,7 +288,7 @@ class Worker:
             if result.overall == CIOverall.PENDING:
                 waited = (now - (t.ci_waiting_since or now)).total_seconds()
                 if waited > self.settings.ci_wait_timeout_seconds:
-                    reason = f"no conclusive result for required checks {self.settings.required_checks} after {int(waited)}s"
+                    reason = f"no conclusive result for required checks {repo_cfg.required_checks} after {int(waited)}s"
                     transition(db, t, S.NEEDS_REVIEW, reason, level="warning")
                     t.resolution = "ci_timeout"
                     self._queue_notification(db, t, "needs_review", reason)
@@ -308,7 +314,15 @@ class Worker:
                 self._queue_notification(db, t, "needs_review", reason)
                 return
 
-            # FAILURE
+            # FAILURE — the failed check selects the route (skill, agent, validator, allowed paths).
+            failed = next(c["name"] for c in result.failed_runs)
+            route = repo_cfg.route(failed)
+            if t.route != route.check:
+                t.route = route.check
+                t.max_attempts = route.max_attempts
+                record_event(db, task_id, "route_selected",
+                             f"Route {route.check} → skill {route.analysis_skill}, agent {route.remediation_agent}",
+                             data=route.model_dump())
             if state == S.VALIDATING:
                 if t.attempt >= t.max_attempts:
                     reason = f"remediation commit {sha[:7]} still fails CI and {t.attempt}/{t.max_attempts} attempts are used"
@@ -329,6 +343,24 @@ class Worker:
                 t.activity = "CI failed — waiting for “Analyze Now”"
                 record_event(db, task_id, "awaiting_approval", "CI failed. Auto Analyze is off — waiting for “Analyze Now”",
                              level="warning")
+
+    def _unconfigured(self, db, t: Task) -> None:
+        reason = f"repository {t.repo} is not configured in control-plane.yaml"
+        if t.state != S.NEEDS_REVIEW and t.state in (S.WAITING_CI, S.VALIDATING, S.ANALYZING, S.TODO, S.IN_PROGRESS):
+            transition(db, t, S.NEEDS_REVIEW, reason, level="warning")
+            t.resolution = "not_configured"
+
+    def _route_or_review(self, db, t: Task) -> tuple[Repository, Route] | None:
+        """The task's route from control-plane.yaml; a task without one goes to NEEDS_REVIEW (never guessed)."""
+        repo_cfg = self.deps.config().repository(t.repo)
+        route = repo_cfg.route(t.route) if repo_cfg else None
+        if repo_cfg is None or route is None:
+            reason = (f"no route for check {t.route!r} of {t.repo} in control-plane.yaml"
+                      if repo_cfg else f"repository {t.repo} is not configured in control-plane.yaml")
+            transition(db, t, S.NEEDS_REVIEW, reason, level="warning")
+            t.resolution = "not_configured"
+            return None
+        return repo_cfg, route
 
     # ------------------------------------------------------------------ dispatch
     def dispatch(self) -> None:
@@ -476,19 +508,23 @@ class Worker:
         tid = r.task_id
         with session_scope() as db:
             t = self._owned(db, tid, S.ANALYZING)
+            resolved = self._route_or_review(db, t)
+            if resolved is None:
+                return
+            repo_cfg, route = resolved
             t.analysis_runs += 1
             t.activity = "Collecting evidence: CI logs, diff, local validation"
             snap = _snapshot(t)
         run_id = self._start_run(tid, "analysis", snap["attempt"])
         emit = self._emitter(run_id, tid)
 
-        evidence = await self._collect_evidence(tid, snap, run_id, emit)
+        evidence = await self._collect_evidence(tid, snap, run_id, emit, repo_cfg, route)
         worktree, bundle = evidence["worktree"], evidence["bundle"]
         self._check_alive(r)
 
-        self.set_activity(tid, "Analysis Skill is investigating the failure")
+        self.set_activity(tid, f"Analysis Skill {route.analysis_skill} is investigating the failure")
         spec = AgentSpec(
-            prompt=analysis_contract.build_prompt(bundle, worktree),
+            prompt=analysis_contract.build_prompt(bundle, worktree, route.analysis_skill),
             tools=["Read", "Grep", "Glob", "Skill"],
             allowed_tools=["Read", "Grep", "Glob", "Skill"],
             json_schema=analysis_contract.output_json_schema(),
@@ -524,13 +560,13 @@ class Worker:
                 return
 
             findings = evidence["findings"]
-            rec = analysis_contract.reconcile(output, findings)
+            rec = analysis_contract.reconcile(output, findings, route)
             t.classification, t.confidence, t.root_cause = rec.classification, output.confidence, output.root_cause
             add_comment(db, tid, "analysis-skill", "diagnosis",
                         analysis_contract.render_markdown(output, rec, findings),
                         data={"analysis": output.model_dump(mode="json"), "reconciled": rec.model_dump(mode="json"),
                               "findings": findings, "findings_source": evidence["findings_source"],
-                              "bundle_dir": str(bundle), "chart_dirs": evidence["chart_dirs"],
+                              "bundle_dir": str(bundle), "route": route.check,
                               "sha": snap["expected_sha"], "run_id": run_id})
             if rec.deterministic_classification and not rec.agreement:
                 record_event(db, tid, "classification_overridden",
@@ -547,11 +583,11 @@ class Worker:
                 t.resolution = "not_auto_remediable"
                 self._queue_notification(db, t, "needs_review", rec.decision_reason)
 
-    async def _collect_evidence(self, tid: int, snap: dict, run_id: int, emit) -> dict:
+    async def _collect_evidence(self, tid: int, snap: dict, run_id: int, emit, repo_cfg: Repository, route: Route) -> dict:
         repo, number, sha = snap["repo"], snap["pr_number"], snap["expected_sha"]
         emit("system", f"collecting evidence for {repo}#{number} @ {sha[:7]}")
         runs = await asyncio.to_thread(self.gh.list_check_runs, repo, sha)
-        ci = aggregate(runs, self.settings.required_checks)
+        ci = aggregate(runs, repo_cfg.required_checks)
         logs, ci_findings, failed = [], [], []
         for c in ci.failed_runs:
             entry = {"name": c["name"], "conclusion": c.get("conclusion"), "url": c.get("html_url")}
@@ -572,8 +608,7 @@ class Worker:
         await self.deps.worktrees.fetch_pr(repo, number, snap["head_branch"], snap["base_branch"])
         worktree = await self.deps.worktrees.create(repo, tid, f"analysis-r{run_id}", sha)
         diff = await self.deps.worktrees.diff_against(worktree, f"refs/rcp/base-{number}", sha)
-        charts = local_validation.chart_dirs(worktree, [f["filename"] for f in files])
-        report = await self.deps.validate(worktree, charts)
+        report = await self.deps.validate(worktree, route)
         local_findings = local_validation.findings_of(report)
         with session_scope() as db:
             db.add(ValidationRun(task_id=tid, sha=sha, purpose="pre-analysis", valid=bool(report.get("valid")),
@@ -581,10 +616,11 @@ class Worker:
             record_event(db, tid, "local_validation",
                          f"Local validation of {sha[:7]}: {'valid' if report.get('valid') else f'{len(local_findings)} finding(s)'}",
                          level="info" if report.get("valid") else "warning",
-                         data={"sha": sha, "charts": charts, "valid": bool(report.get("valid")),
+                         data={"sha": sha, "validator": route.validator, "targets": route.scan_roots,
+                               "valid": bool(report.get("valid")),
                                "findings": [{k: f.get(k) for k in ("category", "check", "file", "line", "message")}
                                             for f in local_findings]})
-        emit("system", f"local validation on {', '.join(charts)}: "
+        emit("system", f"local validation ({route.validator}) on {', '.join(route.scan_roots)}: "
                        f"{'valid' if report.get('valid') else str(len(local_findings)) + ' finding(s)'}")
 
         findings, source = (ci_findings, "ci") if ci_findings else (
@@ -594,18 +630,17 @@ class Worker:
                              "head_branch": snap["head_branch"], "base_branch": snap["base_branch"], "head_sha": sha,
                              "url": snap["pr_url"]},
             "changed_files": files,
-            "chart_dirs": charts,
+            "route": route.model_dump(),
             "failed_checks": failed,
             "deterministic_findings": findings,
             "deterministic_findings_source": source,
             "previous_attempts": snap["attempt"],
-            "remediation_scope": self.settings.remediation_allowed_paths,
+            "remediation_scope": route.allowed_paths,
             "worktree": str(worktree),
         }
         bundle = self.settings.data_dir / "runs" / f"task-{tid}" / f"analysis-{run_id}"
         analysis_contract.write_bundle(bundle, context, redact("\n\n".join(logs)), diff, report)
-        return {"worktree": worktree, "bundle": bundle, "findings": findings, "findings_source": source,
-                "chart_dirs": charts}
+        return {"worktree": worktree, "bundle": bundle, "findings": findings, "findings_source": source}
 
     def _check_alive(self, r: Running) -> None:
         if r.cancel.is_set():
@@ -629,6 +664,10 @@ class Worker:
         tid = r.task_id
         with session_scope() as db:
             t = self._owned(db, tid, S.IN_PROGRESS)
+            resolved = self._route_or_review(db, t)
+            if resolved is None:
+                return False
+            _, route = resolved
             snap = _snapshot(t)
             diag = db.scalar(select(Comment).where(Comment.task_id == tid, Comment.kind == "diagnosis")
                              .order_by(Comment.id.desc()).limit(1))
@@ -650,22 +689,22 @@ class Worker:
         await self.deps.worktrees.fetch_pr(repo, number, snap["head_branch"], snap["base_branch"])
         worktree = await self.deps.worktrees.create(repo, tid, f"fix-a{snap['attempt']}", sha)
         bundle = Path(diag_data.get("bundle_dir") or worktree)
-        charts = diag_data.get("chart_dirs") or ["demo/charts"]
         diagnosis = {"classification": diag_data["reconciled"]["classification"],
                      "deterministic_findings": diag_data.get("findings", []),
                      **{k: diag_data["analysis"][k] for k in ("root_cause", "affected_files", "proposed_fix")}}
 
         run_id = self._start_run(tid, "remediation", snap["attempt"])
         emit = self._emitter(run_id, tid)
-        self.set_activity(tid, f"Remediation Subagent is applying the fix (attempt {snap['attempt']}/{snap['max_attempts']})")
-        tools, allowed = remediation_contract.tool_permissions(worktree)
+        self.set_activity(tid, f"Remediation Subagent {route.remediation_agent} is applying the fix "
+                               f"(attempt {snap['attempt']}/{snap['max_attempts']})")
+        tools, allowed = remediation_contract.tool_permissions(worktree, route)
         spec = AgentSpec(
-            prompt=remediation_contract.build_prompt(diagnosis, worktree, bundle, charts),
+            prompt=remediation_contract.build_prompt(diagnosis, worktree, bundle, route),
             tools=tools,
             allowed_tools=allowed,
             json_schema=remediation_contract.output_json_schema(),
             add_dirs=[worktree, bundle],
-            agent=remediation_contract.AGENT_NAME,
+            agent=route.remediation_agent,
             timeout=self.settings.remediation_timeout_seconds,
         )
         res = await self.deps.run_agent(spec, emit, r.cancel, self._set_pid(run_id))
@@ -683,8 +722,8 @@ class Worker:
         # Deterministic post-checks, independent of what the agent claims.
         self.set_activity(tid, "Verifying scope and running local validation")
         diff, files = await self.deps.worktrees.working_changes(worktree)
-        scope = remediation_contract.check_scope(files)
-        report = await self.deps.validate(worktree, charts)
+        scope = remediation_contract.check_scope(files, route)
+        report = await self.deps.validate(worktree, route)
         valid = bool(report.get("valid"))
         emit("system", f"scope check: {'ok' if scope.ok else '; '.join(scope.violations)} · "
                        f"local validation: {'valid' if valid else 'INVALID'}")
@@ -701,8 +740,9 @@ class Worker:
 
         commit_sha = None
         if not problems:
-            message = (f"fix({charts[0].split('/')[-1]}): {output.summary[:60].rstrip('.')}\n\n"
+            message = (f"fix: {output.summary[:68].rstrip('.')}\n\n"
                        f"{output.rationale.strip()}\n\nClassification: {diagnosis['classification']}\n"
+                       f"Route: {route.check} → {route.remediation_agent}\n"
                        f"Remediation-Task: {tid} (attempt {snap['attempt']})\nGenerated-By: AI Remediation Control Plane")
             commit_sha = await self.deps.worktrees.commit(worktree, message)
         else:
@@ -758,6 +798,10 @@ class Worker:
         tid = r.task_id
         with session_scope() as db:
             t = self._owned(db, tid, S.IN_PROGRESS)
+            resolved = self._route_or_review(db, t)
+            if resolved is None:
+                return
+            repo_cfg, _ = resolved
             rem = latest_remediation(db, tid, t.attempt)
             if rem is None or not rem.commit_sha:
                 raise StageAborted("nothing to push")
@@ -765,7 +809,7 @@ class Worker:
             t.activity = f"Pushing {commit_sha[:7]} to {t.head_branch}"
         repo, branch = snap["repo"], snap["head_branch"]
 
-        if is_protected(branch):
+        if repo_cfg.is_protected(branch):
             self._reject_push(tid, f"branch {branch!r} is protected — the control plane never pushes there")
             return
         pr = await asyncio.to_thread(self.gh.get_pr, repo, snap["pr_number"])
@@ -795,7 +839,7 @@ class Worker:
                                  level="warning")
                 return
             try:
-                await self.deps.worktrees.push(Path(wt), branch)
+                await self.deps.worktrees.push(Path(wt), branch, repo_cfg.protected_branches)
             except GitError as exc:
                 self._reject_push(tid, f"git push failed: {exc}")
                 return
@@ -857,7 +901,7 @@ class Worker:
                 details["commit_url"] = f"https://github.com/{t.repo}/commit/{rem.commit_sha}"
         if n.kind == "remediated":
             details["validation"] = (f"Local validator ✅ · GitHub Actions ✅ "
-                                     f"({', '.join(self.settings.required_checks)}) on `{t.expected_sha[:7]}`")
+                                     f"({t.route or 'required checks'}) on `{t.expected_sha[:7]}`")
         else:
             details["validation"] = f"CI: {t.ci_status or 'unknown'}"
         return details
@@ -886,7 +930,8 @@ def start_remediation(db, t: Task, reason: str) -> None:
 
 def _snapshot(t: Task) -> dict:
     return {k: getattr(t, k) for k in ("id", "repo", "pr_number", "pr_url", "title", "author", "head_branch",
-                                        "base_branch", "head_sha", "expected_sha", "attempt", "max_attempts")}
+                                        "base_branch", "head_sha", "expected_sha", "attempt", "max_attempts",
+                                        "route")}
 
 
 def _task_dict(t: Task) -> dict:

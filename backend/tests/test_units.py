@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.agents import analysis, remediation
+from app.control_plane import get_config
 from app.db import session_scope
 from app.integrations.git_worktree import ChangedFile, is_protected
 from app.integrations.github import CheckRun
@@ -14,7 +15,7 @@ from app.orchestration import ci
 from app.orchestration.state_machine import InvalidTransition, can_transition, transition
 from app.services.redaction import redact
 from app.services.registration import register_pr
-from tests.conftest import ANALYSIS_OK, FINDING, SHA1, pr_info
+from tests.conftest import ANALYSIS_OK, FINDING, SHA1, helm_route, pr_info
 
 # ---------------------------------------------------------------- registration
 
@@ -137,7 +138,7 @@ def test_analysis_output_schema_rejects_bad_payloads():
 
 def test_reconcile_deterministic_evidence_overrides_llm():
     out = analysis.AnalysisOutput.model_validate({**ANALYSIS_OK, "classification": "SCHEMA_VIOLATION"})
-    rec = analysis.reconcile(out, [FINDING])
+    rec = analysis.reconcile(out, [FINDING], helm_route())
     assert rec.classification == "LOGICAL_CONFIGURATION_ERROR"
     assert rec.llm_classification == "SCHEMA_VIOLATION" and rec.agreement is False
 
@@ -157,13 +158,13 @@ def test_reconcile_priority_syntax_wins():
 ])
 def test_reconcile_blocks_unsafe_auto_fix(patch, reason):
     out = analysis.AnalysisOutput.model_validate({**ANALYSIS_OK, **patch})
-    rec = analysis.reconcile(out, [] if patch.get("classification") else [FINDING])
+    rec = analysis.reconcile(out, [] if patch.get("classification") else [FINDING], helm_route())
     assert rec.remediable is False and reason in rec.decision_reason
 
 
 def test_render_markdown_mentions_override():
     out = analysis.AnalysisOutput.model_validate({**ANALYSIS_OK, "classification": "SYNTAX_ERROR"})
-    md = analysis.render_markdown(out, analysis.reconcile(out, [FINDING]), [FINDING])
+    md = analysis.render_markdown(out, analysis.reconcile(out, [FINDING], helm_route()), [FINDING])
     assert "overridden" in md and "| LOGICAL_CONFIGURATION_ERROR |" in md
 
 
@@ -171,7 +172,7 @@ def test_render_markdown_mentions_override():
 
 
 def test_tool_permissions_are_least_privilege(tmp_path):
-    tools, allowed = remediation.tool_permissions(tmp_path)
+    tools, allowed = remediation.tool_permissions(tmp_path, helm_route())
     assert "WebFetch" not in tools and "Write" not in tools
     edit_rules = [a for a in allowed if a.startswith("Edit(")]
     assert edit_rules == [f"Edit(/{tmp_path.resolve()}/demo/charts/**)"]
@@ -181,26 +182,28 @@ def test_tool_permissions_are_least_privilege(tmp_path):
 
 
 def test_scope_check():
-    ok = remediation.check_scope([ChangedFile("demo/charts/payments-api/values.yaml", "M", 1, 1)])
+    ok = remediation.check_scope([ChangedFile("demo/charts/payments-api/values.yaml", "M", 1, 1)], helm_route())
     assert ok.ok
-    bad = remediation.check_scope([ChangedFile(".github/workflows/helm-validate.yaml", "M", 1, 1)])
+    bad = remediation.check_scope([ChangedFile(".github/workflows/helm-validate.yaml", "M", 1, 1)], helm_route())
     assert not bad.ok and "outside allowlist" in bad.violations[0]
-    deleted = remediation.check_scope([ChangedFile("demo/charts/payments-api/templates/service.yaml", "D", 0, 20)])
+    deleted = remediation.check_scope([ChangedFile("demo/charts/payments-api/templates/service.yaml", "D", 0, 20)], helm_route())
     assert not deleted.ok
-    huge = remediation.check_scope([ChangedFile("demo/charts/payments-api/values.yaml", "M", 100, 100)])
+    huge = remediation.check_scope([ChangedFile("demo/charts/payments-api/values.yaml", "M", 100, 100)], helm_route())
     assert not huge.ok
-    assert not remediation.check_scope([]).ok
+    assert not remediation.check_scope([], helm_route()).ok
 
 
 def test_protected_branches():
-    assert is_protected("main") and is_protected("release/1.2")
-    assert not is_protected("demo/logical-error-20250101")
+    repo = get_config().repository("acme/demo")
+    assert repo.is_protected("main") and repo.is_protected("release/1.2")
+    assert not repo.is_protected("demo/logical-error-20250101")
+    assert is_protected("main", ["main"]) and not is_protected("demo/x", ["main"])
 
 
 def test_build_command_never_bypasses_permissions(tmp_path):
     from app.integrations.claude_runner import AgentSpec, build_command
 
-    tools, allowed = remediation.tool_permissions(tmp_path)
+    tools, allowed = remediation.tool_permissions(tmp_path, helm_route())
     cmd = build_command(AgentSpec(prompt="x", tools=tools, allowed_tools=allowed, json_schema={}, agent="k8s-remediator"))
     assert "--dangerously-skip-permissions" not in cmd
     assert cmd[cmd.index("--permission-mode") + 1] == "dontAsk"
@@ -252,3 +255,29 @@ def test_parse_event_keeps_full_tool_input_and_output():
     assert k1 == "tool_use" and t1 == "Edit · /wt/values.yaml" and '"new_string": "8080"' in d1
     assert k2 == "tool_result" and len(t2) < 410 and d2 == long_output  # summary truncated, detail complete
     assert k3 == "result" and '"status": "fixed"' in d3
+
+
+# ---------------------------------------------------------------- control-plane.yaml
+
+
+def test_control_plane_config_rejects_missing_agent_and_bad_schema(tmp_path):
+    from app.control_plane import ConfigError, load
+    from tests.conftest import TEST_CONFIG
+
+    missing = tmp_path / "missing.yaml"
+    missing.write_text(TEST_CONFIG.replace("k8s-remediator", "terraform-remediator"))
+    with pytest.raises(ConfigError, match="terraform-remediator.md not found"):
+        load(missing)
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(TEST_CONFIG.replace('allowed_paths: ["demo/charts/**"]', "allowed_paths: []"))
+    with pytest.raises(ConfigError, match="invalid"):
+        load(bad)
+    with pytest.raises(ConfigError, match="not found"):
+        load(tmp_path / "absent.yaml")
+
+
+def test_route_scan_roots_and_scope():
+    route = helm_route()
+    assert route.scan_roots == ["demo/charts"]
+    assert route.in_scope("demo/charts/payments-api/values.yaml") and not route.in_scope("backend/app/main.py")
+    assert route.validator_path.name == "validate.py" and route.validator_path.exists()

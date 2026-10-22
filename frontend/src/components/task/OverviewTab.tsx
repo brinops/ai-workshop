@@ -1,8 +1,9 @@
-import { AlertTriangle, FileCode2, Scale, Search } from "lucide-react";
+import { AlertTriangle, FileCode2, Route as RouteIcon, Scale, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { ClassificationChip } from "@/components/common/StatusBits";
 import { FindingsList } from "@/components/common/ValidationReportView";
 import { Badge } from "@/components/ui/badge";
+import { useConfig } from "@/hooks/queries";
 import { formatPercent } from "@/lib/format";
 import { isOverridden, latestDiagnosis } from "@/lib/selectors";
 import type { TaskDetail } from "@/services/api";
@@ -20,6 +21,37 @@ function Section({ title, children, icon: Icon }: { title: string; children: Rea
   );
 }
 
+function RouteSection({ repo, check }: { repo: string; check: string }) {
+  const { data } = useConfig();
+  const route = data?.repositories.find((r) => r.repo.toLowerCase() === repo.toLowerCase())?.routes.find((r) => r.check === check);
+  return (
+    <Section title="Route (control-plane.yaml)" icon={RouteIcon}>
+      {!route ? (
+        <p className="text-sm text-muted">
+          Route <span className="font-mono">{check}</span> is not in the active configuration.
+        </p>
+      ) : (
+        <dl className="grid gap-x-6 gap-y-1.5 rounded-md border border-line bg-panel px-4 py-3 text-sm sm:grid-cols-[max-content_1fr]">
+          <dt className="text-xs text-faint">Failed check</dt>
+          <dd className="font-mono">{route.check}</dd>
+          <dt className="text-xs text-faint">Analysis skill</dt>
+          <dd className="font-mono">.claude/skills/{route.analysis_skill}</dd>
+          <dt className="text-xs text-faint">Remediation agent</dt>
+          <dd className="font-mono">.claude/agents/{route.remediation_agent}.md</dd>
+          <dt className="text-xs text-faint">Validator</dt>
+          <dd className="break-all font-mono">{route.validator}</dd>
+          <dt className="text-xs text-faint">Allowed paths</dt>
+          <dd className="font-mono">{route.allowed_paths.join(", ")}</dd>
+          <dt className="text-xs text-faint">Limits</dt>
+          <dd>
+            ≤ {route.max_changed_lines} changed lines · {route.max_attempts} attempts
+          </dd>
+        </dl>
+      )}
+    </Section>
+  );
+}
+
 export function OverviewTab({ detail }: { detail: TaskDetail }) {
   const { task } = detail;
   const diag = latestDiagnosis(detail);
@@ -31,6 +63,7 @@ export function OverviewTab({ detail }: { detail: TaskDetail }) {
   return (
     <div className="flex flex-col gap-6">
       <StatusCallout task={task} />
+      {task.route && <RouteSection repo={task.repo} check={task.route} />}
 
       {!diag ? (
         <div className="rounded-md border border-dashed border-line-strong px-4 py-6 text-center">
