@@ -1,0 +1,14 @@
+id: B
+slug: schema-violation
+title: "Scale payments-api to three replicas"
+expected_category: SCHEMA_VIOLATION
+description: >
+  A developer writes the replica count as a word. The YAML parses and the chart
+  renders, but the Deployment's spec.replicas is no longer an integer, which the
+  Kubernetes OpenAPI schema (kubeconform) rejects.
+pr_body: |
+  Scale payments-api for the upcoming campaign: three replicas.
+file: demo/charts/payments-api/values.yaml
+edits:
+  - old: "replicaCount: 2\n"
+    new: "replicaCount: three\n"

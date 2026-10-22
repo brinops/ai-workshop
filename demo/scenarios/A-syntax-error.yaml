@@ -1,0 +1,14 @@
+id: A
+slug: syntax-error
+title: "Raise payments-api memory limit"
+expected_category: SYNTAX_ERROR
+description: >
+  A developer bumps the memory limit and mis-indents the key, so values.yaml
+  is no longer valid YAML. helm cannot even load the chart.
+pr_body: |
+  Payments API is OOM-killed under the Black Friday load test.
+  Raise the memory limit to 384Mi.
+file: demo/charts/payments-api/values.yaml
+edits:
+  - old: "  limits:\n    cpu: 500m\n    memory: 256Mi\n"
+    new: "  limits:\n    cpu: 500m\n     memory: 384Mi\n"

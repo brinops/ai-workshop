@@ -1,0 +1,15 @@
+id: C
+slug: logical-error
+title: "Expose payments-api metrics port on the Service"
+expected_category: LOGICAL_CONFIGURATION_ERROR
+description: >
+  A developer points the Service at port 9090 (the metrics port they believe the
+  app uses). Everything is syntactically and schema-valid, but the application
+  listens on app.port=8080: the Service would black-hole all traffic. Only the
+  consistency check (Service targetPort vs container ports) catches it.
+pr_body: |
+  Route Service traffic to 9090 so Prometheus can scrape through the Service.
+file: demo/charts/payments-api/values.yaml
+edits:
+  - old: "  targetPort: 8080\n"
+    new: "  targetPort: 9090\n"
