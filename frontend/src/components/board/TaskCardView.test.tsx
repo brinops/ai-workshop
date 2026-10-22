@@ -33,6 +33,8 @@ const base: TaskCard = {
   attempt: 1,
   max_attempts: 2,
   activity: "Running helm lint in the worktree",
+  cost_usd: 0.316,
+  agent_runs: 2,
   agent_running: true,
   last_error: null,
   created_at: "2026-10-22T11:50:00Z",
@@ -46,6 +48,7 @@ describe("TaskCardView", () => {
     expect(screen.getByText("CI failed")).toBeInTheDocument();
     expect(screen.getByText("Schema violation")).toBeInTheDocument();
     expect(screen.getByText("attempt 1/2")).toBeInTheDocument();
+    expect(screen.getByText(/\$0.32 · 2 runs/)).toBeInTheDocument();
     expect(screen.getByText(/Running helm lint in the worktree/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Bump web chart replicas" })).toHaveAttribute("href", "/tasks/7");
     expect(screen.getByText("updated 30s ago")).toBeInTheDocument();

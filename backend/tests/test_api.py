@@ -132,3 +132,18 @@ def test_config_endpoint(client):
     cfg = client.get("/api/config").json()
     route = cfg["repositories"][0]["routes"][0]
     assert route["check"] == "helm-validate" and route["remediation_agent"] == "k8s-remediator"
+
+
+def test_card_shows_total_agent_cost(client):
+    from app.db import session_scope
+    from app.models import AgentRun
+
+    tid = client.post("/api/tasks/register", json={"repo": "acme/demo", "pr_number": 7}).json()["task_id"]
+    card = client.get("/api/board").json()["columns"]["NEW"][0]
+    assert card["cost_usd"] is None and card["agent_runs"] == 0
+    with session_scope() as db:
+        db.add(AgentRun(task_id=tid, kind="analysis", status="succeeded", cost_usd=0.285))
+        db.add(AgentRun(task_id=tid, kind="remediation", status="succeeded", cost_usd=0.031))
+        db.add(AgentRun(task_id=tid, kind="analysis", status="interrupted", cost_usd=None))
+    card = client.get(f"/api/tasks/{tid}").json()["task"]
+    assert round(card["cost_usd"], 3) == 0.316 and card["agent_runs"] == 3
