@@ -159,7 +159,8 @@ class AgentLogLine(Base):
     task_id: Mapped[int] = mapped_column(Integer, index=True)
     ts: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     kind: Mapped[str] = mapped_column(String(32))  # system | text | tool_use | tool_result | result | stderr
-    text: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)  # one-line summary
+    detail: Mapped[str | None] = mapped_column(Text)  # full tool input / output, shown when expanded
 
 
 class Remediation(Base):

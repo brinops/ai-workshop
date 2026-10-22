@@ -61,7 +61,8 @@ class AgentResult:
     permission_denials: list = field(default_factory=list)
 
 
-LogFn = Callable[[str, str], None]
+LogFn = Callable[..., None]  # emit(kind, summary, detail=None)
+DETAIL_LIMIT = 20_000
 
 
 def agent_env() -> dict[str, str]:
@@ -141,24 +142,30 @@ def parse_event(evt: dict, emit: LogFn, state: dict) -> None:
                 emit("text", block["text"].strip())
             elif block.get("type") == "tool_use":
                 name = block.get("name", "?")
+                detail = json.dumps(block.get("input") or {}, indent=2, ensure_ascii=False)[:DETAIL_LIMIT]
                 if name == "StructuredOutput":
-                    emit("tool_use", "StructuredOutput · returning structured result")
+                    emit("tool_use", "StructuredOutput · returning structured result", detail)
                 else:
-                    emit("tool_use", f"{name} · {_summarize_tool_input(name, block.get('input') or {})}")
+                    emit("tool_use", f"{name} · {_summarize_tool_input(name, block.get('input') or {})}", detail)
     elif kind == "user":
         for block in (evt.get("message") or {}).get("content") or []:
             if isinstance(block, dict) and block.get("type") == "tool_result":
                 content = block.get("content")
                 if isinstance(content, list):
                     content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
-                text = str(content or "").strip().replace("\n", " ⏎ ")
+                full = str(content or "").strip()
+                text = full.replace("\n", " ⏎ ")
                 prefix = "error · " if block.get("is_error") else ""
-                emit("tool_result", prefix + (text[:400] + ("…" if len(text) > 400 else "")))
+                emit("tool_result", prefix + (text[:400] + ("…" if len(text) > 400 else "")),
+                     full[:DETAIL_LIMIT] if len(text) > 400 or "\n" in full else None)
     elif kind == "result":
         state["result"] = evt
         cost = evt.get("total_cost_usd")
+        summary = {k: evt.get(k) for k in ("subtype", "is_error", "num_turns", "duration_ms", "total_cost_usd",
+                                           "permission_denials", "structured_output")}
         emit("result", f"{evt.get('subtype')} · {evt.get('num_turns')} turns · "
-                       f"${cost:.4f}" if isinstance(cost, (int, float)) else f"{evt.get('subtype')}")
+                       f"${cost:.4f}" if isinstance(cost, (int, float)) else f"{evt.get('subtype')}",
+             json.dumps(summary, indent=2, ensure_ascii=False)[:DETAIL_LIMIT])
 
 
 async def run_agent(

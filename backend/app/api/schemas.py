@@ -112,6 +112,7 @@ class LogLineOut(_Out):
     ts: datetime
     kind: str
     text: str
+    detail: str | None
 
 
 class RemediationOut(_Out):

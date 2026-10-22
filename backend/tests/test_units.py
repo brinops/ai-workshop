@@ -225,3 +225,30 @@ def test_redaction():
     out = redact(text)
     assert "ghp_" not in out and "hooks.slack.com/services/T0" not in out
     assert "abc.def.ghi" not in out and "hunter22" not in out
+
+
+# ---------------------------------------------------------------- agent log detail
+
+
+def test_parse_event_keeps_full_tool_input_and_output():
+    from app.integrations.claude_runner import parse_event
+
+    lines: list[tuple] = []
+
+    def emit(kind, text, detail=None):
+        lines.append((kind, text, detail))
+
+    long_output = "\n".join(f"line {i}" for i in range(300))
+    parse_event({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Edit", "input": {"file_path": "/wt/values.yaml", "old_string": "9090", "new_string": "8080"}},
+    ]}}, emit, {})
+    parse_event({"type": "user", "message": {"content": [
+        {"type": "tool_result", "content": long_output, "is_error": False},
+    ]}}, emit, {})
+    parse_event({"type": "result", "subtype": "success", "num_turns": 3, "total_cost_usd": 0.01,
+                 "structured_output": {"status": "fixed"}}, emit, {})
+
+    (k1, t1, d1), (k2, t2, d2), (k3, _, d3) = lines
+    assert k1 == "tool_use" and t1 == "Edit · /wt/values.yaml" and '"new_string": "8080"' in d1
+    assert k2 == "tool_result" and len(t2) < 410 and d2 == long_output  # summary truncated, detail complete
+    assert k3 == "result" and '"status": "fixed"' in d3
