@@ -17,7 +17,7 @@ service:
   type: ClusterIP
   port: 80
   # Must route to the container port the application listens on.
-  targetPort: 8080
+  targetPort: 9090
 
 resources:
   requests:
