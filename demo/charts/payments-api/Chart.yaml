@@ -1,0 +1,6 @@
+apiVersion: v2
+name: payments-api
+description: Payments API used by the AI Remediation Control Plane workshop
+type: application
+version: 0.3.0
+appVersion: "1.8.2"

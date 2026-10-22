@@ -1,0 +1,52 @@
+# Required check for the AI Remediation Control Plane.
+# The check run is named `helm-validate` (job id) — keep REQUIRED_CHECKS in sync.
+name: Helm validation
+
+on:
+  # No paths filter on pull_request: the required check must report on every PR commit,
+  # otherwise a PR that does not touch charts would wait for a check that never runs.
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "demo/charts/**"
+      - "tools/chart_validator/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helm-validate:
+    name: helm-validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      KUBECONFORM_VERSION: v0.6.7
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+          kubeconform -v
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validator dependencies
+        run: pip install --quiet "pyyaml>=6"
+
+      - name: Validate charts (YAML, helm lint, helm template, kubeconform, consistency)
+        env:
+          KUBECONFORM_CACHE: ${{ runner.temp }}/kubeconform-cache
+        run: python tools/chart_validator/validate.py demo/charts --format github

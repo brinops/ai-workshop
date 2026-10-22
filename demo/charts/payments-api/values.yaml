@@ -1,0 +1,33 @@
+# Payments API — the application process listens on `app.port`.
+# Every port in this chart must agree with it: the container port,
+# the Service targetPort and the health probes.
+replicaCount: 2
+
+image:
+  repository: ghcr.io/nginxinc/nginx-unprivileged
+  tag: "1.27-alpine"
+  pullPolicy: IfNotPresent
+
+app:
+  # Port the application binds to inside the container.
+  port: 8080
+  logLevel: info
+
+service:
+  type: ClusterIP
+  port: 80
+  # Must route to the container port the application listens on.
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  path: /
+  initialDelaySeconds: 5
+  periodSeconds: 10

@@ -1,0 +1,31 @@
+# secrets
+.env
+.env.*
+!.env.example
+client_secret_*.json
+creds.txt
+*.pem
+
+# runtime state
+var/
+*.db
+*.db-wal
+*.db-shm
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# os / editors
+.DS_Store
+.idea/
+.vscode/
+.claude/settings.local.json
