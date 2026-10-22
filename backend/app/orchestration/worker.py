@@ -274,7 +274,9 @@ class Worker:
                 summary = ", ".join(f"{c['name']}={c['verdict']}" for c in result.required) or "no checks yet"
                 record_event(db, task_id, "ci_status", f"CI on {sha[:7]}: {result.overall} ({summary})",
                              level={"failure": "error", "success": "success"}.get(result.overall, "info"),
-                             data={"sha": sha, "overall": result.overall})
+                             data={"sha": sha, "overall": result.overall,
+                                   "checks": [{k: c.get(k) for k in ("name", "verdict", "conclusion", "html_url")}
+                                              for c in result.required + result.others]})
             t.ci_status = result.overall
 
             if result.overall == CIOverall.PENDING:
@@ -433,9 +435,10 @@ class Worker:
             return run.id
 
     def _emitter(self, run_id: int, task_id: int):
-        def emit(kind: str, text: str) -> None:
+        def emit(kind: str, text: str, detail: str | None = None) -> None:
             with session_scope() as db:
-                db.add(AgentLogLine(run_id=run_id, task_id=task_id, kind=kind, text=redact(text)[:4000]))
+                db.add(AgentLogLine(run_id=run_id, task_id=task_id, kind=kind, text=redact(text)[:4000],
+                                    detail=redact(detail)[:20000] if detail else None))
         return emit
 
     def _set_pid(self, run_id: int):
@@ -463,7 +466,10 @@ class Worker:
                          f"{run.kind.capitalize()} agent {run.status}"
                          + (f" · {res.num_turns} turns" if res.num_turns else "")
                          + (f" · ${res.cost_usd:.3f}" if res.cost_usd else ""),
-                         level=level, data={"run_id": run_id, "status": run.status})
+                         level=level, data={"run_id": run_id, "status": run.status, "model": run.model,
+                                            "turns": res.num_turns, "cost_usd": res.cost_usd,
+                                            "session_id": res.session_id, "error": run.error,
+                                            "permission_denials": res.permission_denials or None})
 
     # ------------------------------------------------------------------ ANALYZING
     async def run_analysis(self, r: Running) -> None:
@@ -574,7 +580,10 @@ class Worker:
                                  exit_code=report.get("exit_code", -1), report=report))
             record_event(db, tid, "local_validation",
                          f"Local validation of {sha[:7]}: {'valid' if report.get('valid') else f'{len(local_findings)} finding(s)'}",
-                         level="info" if report.get("valid") else "warning")
+                         level="info" if report.get("valid") else "warning",
+                         data={"sha": sha, "charts": charts, "valid": bool(report.get("valid")),
+                               "findings": [{k: f.get(k) for k in ("category", "check", "file", "line", "message")}
+                                            for f in local_findings]})
         emit("system", f"local validation on {', '.join(charts)}: "
                        f"{'valid' if report.get('valid') else str(len(local_findings)) + ' finding(s)'}")
 

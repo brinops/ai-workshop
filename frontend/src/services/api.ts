@@ -116,6 +116,8 @@ export interface LogLineOut {
   ts: string;
   kind: LogKind | string;
   text: string;
+  /** Full tool input / output (present when the summary in `text` is abridged). */
+  detail: string | null;
 }
 
 /** Report produced by tools/chart_validator/validate.py (`--format json`). */

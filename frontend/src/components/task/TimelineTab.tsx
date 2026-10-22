@@ -1,9 +1,55 @@
+import { ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { DataView } from "@/components/common/DataView";
 import { EventIcon } from "@/components/common/EventIcon";
 import { levelColor } from "@/lib/events";
 import { useNow } from "@/hooks/useNow";
 import { absoluteTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { EventOut } from "@/services/api";
+
+function EventBody({ e, compact, now }: { e: EventOut; compact: boolean; now: number }) {
+  return (
+    <>
+      <p className={cn("leading-snug", compact ? "text-sm" : "text-[0.9rem]", e.level === "info" ? "text-fg/95" : levelColor(e.level))}>
+        {e.message}
+      </p>
+      <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-faint">
+        <time dateTime={e.ts}>{absoluteTime(e.ts)}</time>
+        <span>{relativeTime(e.ts, now)}</span>
+        {!compact && <span className="font-mono">{e.type}</span>}
+      </p>
+    </>
+  );
+}
+
+function TimelineItem({ e, compact, now }: { e: EventOut; compact: boolean; now: number }) {
+  const [open, setOpen] = useState(false);
+  if (compact) return <EventBody e={e} compact now={now} />;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="group -mx-1.5 flex w-[calc(100%+0.75rem)] items-start gap-1 rounded-md px-1.5 py-0.5 text-left hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <div className="min-w-0 flex-1">
+          <EventBody e={e} compact={false} now={now} />
+        </div>
+        <ChevronRight
+          className={cn("mt-1 size-4 shrink-0 text-faint transition-transform group-hover:text-muted", open && "rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <div className="mt-2 rounded-md border border-line bg-panel px-3 py-2.5">
+          <DataView data={{ ...(e.data ?? {}), event_id: e.id, level: e.level, recorded_at: e.ts }} />
+        </div>
+      )}
+    </>
+  );
+}
 
 export function Timeline({ events, limit, compact = false }: { events: EventOut[]; limit?: number; compact?: boolean }) {
   const now = useNow(5000);
@@ -17,14 +63,7 @@ export function Timeline({ events, limit, compact = false }: { events: EventOut[
           {i < shown.length - 1 && <span className="absolute left-3 top-7 bottom-0 w-px bg-line" aria-hidden />}
           <EventIcon type={e.type} level={e.level} />
           <div className="min-w-0 flex-1 pt-0.5">
-            <p className={cn("leading-snug", compact ? "text-sm" : "text-[0.9rem]", e.level === "info" ? "text-fg/95" : levelColor(e.level))}>
-              {e.message}
-            </p>
-            <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-faint">
-              <time dateTime={e.ts}>{absoluteTime(e.ts)}</time>
-              <span>{relativeTime(e.ts, now)}</span>
-              {!compact && <span className="font-mono">{e.type}</span>}
-            </p>
+            <TimelineItem e={e} compact={compact} now={now} />
           </div>
         </li>
       ))}

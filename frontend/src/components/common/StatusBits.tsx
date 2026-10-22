@@ -103,14 +103,15 @@ export function CIStatus({ status, sha, className }: { status: string | null | u
   );
 }
 
-export function VerdictBadge({ verdict }: { verdict: string }) {
+/** `animate` = the check is pending *right now*; historical pending snapshots stay static. */
+export function VerdictBadge({ verdict, animate = true }: { verdict: string; animate?: boolean }) {
   const tone =
     verdict === "success" ? "success" : verdict === "failure" ? "danger" : verdict === "pending" || verdict === "missing" ? "amber" : "gray";
   const Icon =
     verdict === "success" ? CheckCircle2 : verdict === "failure" ? XCircle : verdict === "pending" ? Loader2 : verdict === "cancelled" ? Ban : CircleDashed;
   return (
     <Badge tone={tone}>
-      <Icon className={cn(verdict === "pending" && "animate-spin")} aria-hidden />
+      <Icon className={cn(verdict === "pending" && animate && "animate-spin")} aria-hidden />
       {verdict}
     </Badge>
   );

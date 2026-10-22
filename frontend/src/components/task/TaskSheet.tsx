@@ -94,7 +94,12 @@ function TaskDetailBody({ taskId }: { taskId: number }) {
             <LogsTab taskId={task.id} runs={data.runs} />
           </TabsContent>
           <TabsContent value="validation">
-            <ValidationTab validations={data.validations} ci={data.ci} />
+            <ValidationTab
+              validations={data.validations}
+              ci={data.ci}
+              trackedSha={task.expected_sha}
+              waitingForCi={task.state === "WAITING_CI" || task.state === "VALIDATING"}
+            />
           </TabsContent>
           <TabsContent value="slack">
             <SlackTab notifications={data.notifications} />

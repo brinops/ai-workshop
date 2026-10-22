@@ -1,4 +1,4 @@
-import { AlertOctagon, ArrowDownToLine, Bot, ChevronRight, Flag, MessageSquareText, Terminal, Wrench } from "lucide-react";
+import { AlertOctagon, ArrowDownToLine, Bot, ChevronDown, ChevronRight, Flag, MessageSquareText, Terminal, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ function runTone(status: string) {
   return "danger" as const;
 }
 
-function LogLine({ line }: { line: LogLineOut }) {
+function LogLineBody({ line }: { line: LogLineOut }) {
   const time = <span className="w-[4.75rem] shrink-0 select-none pt-px font-mono text-[0.7rem] text-faint tabular-nums">{clockTime(line.ts)}</span>;
   switch (line.kind) {
     case "tool_use": {
@@ -72,6 +72,36 @@ function LogLine({ line }: { line: LogLineOut }) {
         </div>
       );
   }
+}
+
+/** A log line; lines carrying the full tool input/output expand on click. */
+function LogLine({ line }: { line: LogLineOut }) {
+  const [open, setOpen] = useState(false);
+  if (!line.detail) return <LogLineBody line={line} />;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        title={open ? "Collapse" : "Show full content"}
+        className="group -mx-1 flex w-[calc(100%+0.5rem)] items-start rounded px-1 text-left hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <div className="min-w-0 flex-1">
+          <LogLineBody line={line} />
+        </div>
+        <ChevronDown
+          className={cn("mt-1.5 size-3.5 shrink-0 text-faint transition-transform group-hover:text-muted", !open && "-rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <pre className="mb-1.5 ml-[6.6rem] max-h-96 overflow-auto rounded border border-line bg-panel px-3 py-2 font-mono text-[0.75rem] leading-relaxed whitespace-pre-wrap break-words text-fg/90 scroll-thin">
+          {line.detail}
+        </pre>
+      )}
+    </div>
+  );
 }
 
 export function LogStream({ taskId, run, height = "32rem" }: { taskId: number; run: AgentRunOut; height?: string }) {
