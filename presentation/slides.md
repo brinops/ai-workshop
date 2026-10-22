@@ -583,7 +583,7 @@ class: stage
 <!--
 **Час: 10–15 хв (демо).** Цей слайд — міст. НЕ симулюємо демо в презентації; перемикаємося на справжній дашборд і термінал.
 
-Підготовка (зробити ДО доповіді): бекенд запущено (`make dev` у репозиторії), `gh auth status` ок, `claude` залогінений, Slack webhook налаштовано, гілка сценарію підготовлена `demo/scripts/scenario.py prepare C`, вкладки відкриті: дашборд, PR у GitHub, Slack-канал.
+Підготовка (зробити ДО доповіді): бекенд запущено (`just dev` у репозиторії), `gh auth status` ок, `claude` залогінений, Slack webhook налаштовано, гілка сценарію підготовлена `demo/scripts/scenario.py prepare C`, вкладки відкриті: дашборд, PR у GitHub, Slack-канал.
 
 Сценарій:
 1. **Create PR** — у Claude Code: «create a PR for this change». Показати повідомлення hook у сесії: «PR #N registered as task …».
