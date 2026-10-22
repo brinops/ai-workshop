@@ -19,13 +19,13 @@ class Settings(BaseSettings):
     # --- service
     api_host: str = "127.0.0.1"
     api_port: int = 8000
-    public_url: str = "http://localhost:8000"
+    public_url: str = "http://127.0.0.1:8000"
     data_dir: Path = REPO_ROOT / "var"
     database_url: str | None = None
     rcp_api_token: str | None = None  # optional bearer token required by /api/tasks/register
     run_worker: bool = True  # run the worker loop inside the API process
     log_level: str = "INFO"
-    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://[::1]:5173"]
 
     # --- GitHub
     github_token: str | None = None  # falls back to `gh auth token`

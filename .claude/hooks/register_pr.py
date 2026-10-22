@@ -6,12 +6,14 @@ Behaviour
     AND the PR can be resolved — other tool executions are ignored.
   * Resolves the PR URL from the command output (fallback: `gh pr view` for the current branch),
     then confirms it exists via `gh pr view --json`.
-  * POSTs an idempotent registration to $RCP_API_URL/api/tasks/register (the backend de-duplicates
+  * POSTs an idempotent registration to $RCP_API_URL/api/tasks/register (RCP_API_URL, then PUBLIC_URL,
+    from the environment or the project's .env; default http://127.0.0.1:8000) (the backend de-duplicates
     on repo + PR number and re-verifies the PR against GitHub itself).
   * Never blocks or fails the developer's workflow: always exits 0. If the backend is down, the
     registration is spooled to ~/.cache/rcp/pending-registrations.jsonl and retried on the next
     invocation (or with `register_pr.py --flush`).
-  * No secrets in the hook configuration: an optional bearer token is read from $RCP_API_TOKEN.
+  * No secrets in the hook configuration: an optional bearer token is read from RCP_API_TOKEN
+    (environment or the git-ignored .env).
 
 Manual use
   register_pr.py --flush              retry spooled registrations
@@ -29,7 +31,24 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-API_URL = os.environ.get("RCP_API_URL", "http://localhost:8000").rstrip("/")
+
+def _dotenv() -> dict[str, str]:
+    """Non-secret settings from the project's .env (git-ignored), so the hook config itself stays static."""
+    path = Path(os.environ.get("CLAUDE_PROJECT_DIR", Path(__file__).resolve().parents[2])) / ".env"
+    out: dict[str, str] = {}
+    try:
+        for line in path.read_text().splitlines():
+            m = re.match(r"^\s*([A-Z0-9_]+)\s*=\s*([^#]*)", line)
+            if m:
+                out[m.group(1)] = m.group(2).strip().strip("'\"")
+    except OSError:
+        pass
+    return out
+
+
+_ENV = {**_dotenv(), **{k: v for k, v in os.environ.items() if k.startswith("RCP_")}}
+API_URL = (_ENV.get("RCP_API_URL") or _ENV.get("PUBLIC_URL") or "http://127.0.0.1:8000").rstrip("/")
+API_TOKEN = _ENV.get("RCP_API_TOKEN")
 SPOOL = Path(os.environ.get("RCP_SPOOL_FILE", Path.home() / ".cache" / "rcp" / "pending-registrations.jsonl"))
 PR_CREATE_RE = re.compile(r"(?:^|[\s;&|(])gh\s+pr\s+create\b")
 PR_URL_RE = re.compile(r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\d+)")
@@ -86,7 +105,7 @@ def post(payload: dict) -> tuple[bool, str]:
         f"{API_URL}/api/tasks/register",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json",
-                 **({"Authorization": f"Bearer {os.environ['RCP_API_TOKEN']}"} if os.environ.get("RCP_API_TOKEN") else {})},
+                 **({"Authorization": f"Bearer {API_TOKEN}"} if API_TOKEN else {})},
         method="POST",
     )
     try:

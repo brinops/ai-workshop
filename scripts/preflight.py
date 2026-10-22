@@ -120,7 +120,7 @@ def main() -> int:
             check("Slack test message", False, str(exc)[:120])
 
     # --- service
-    api = env.get("PUBLIC_URL", "http://localhost:8000").rstrip("/")
+    api = (env.get("RCP_API_URL") or env.get("PUBLIC_URL") or "http://127.0.0.1:8000").rstrip("/")
     try:
         with urllib.request.urlopen(f"{api}/api/health", timeout=5) as resp:
             health = json.loads(resp.read())

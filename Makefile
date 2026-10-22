@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 PY := backend/.venv/bin/python
+PORT ?= 8000
+API := http://127.0.0.1:$(PORT)
 export KUBECONFORM_CACHE ?= $(CURDIR)/var/kubeconform-cache
 
 help: ## Show targets
@@ -14,7 +16,7 @@ build-ui: ## Build the dashboard into frontend/dist (served by the API on :8000)
 	cd frontend && pnpm build
 
 dev: ## Run API + worker on :8000 (serves the built UI)
-	cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+	cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port $(PORT)
 
 dev-ui: ## Run the Vite dev server on :5173 (proxies /api to :8000)
 	cd frontend && pnpm dev
@@ -46,11 +48,11 @@ preflight: ## Verify binaries, credentials, integrations, service health
 	python3 scripts/preflight.py
 
 autonomous: ## Switch automation to fully autonomous (workshop mode)
-	curl -s -X PUT localhost:8000/api/settings/automation -H 'content-type: application/json' \
+	curl -s -X PUT $(API)/api/settings/automation -H 'content-type: application/json' \
 	  -d '{"auto_analyze":true,"auto_remediate":true,"auto_push":true}'; echo
 
 safe: ## Switch automation to safe mode (push requires approval)
-	curl -s -X PUT localhost:8000/api/settings/automation -H 'content-type: application/json' \
+	curl -s -X PUT $(API)/api/settings/automation -H 'content-type: application/json' \
 	  -d '{"auto_analyze":true,"auto_remediate":true,"auto_push":false}'; echo
 
 reset-db: ## Delete the local database (tasks/history)

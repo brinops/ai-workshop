@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from app import db as dbmod
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.integrations.claude_runner import AgentResult
 from app.integrations.git_worktree import ChangedFile
 from app.integrations.github import CheckRun, resolve_token
@@ -17,6 +17,7 @@ from app.services.registration import PRInfo
 
 @pytest.fixture(autouse=True)
 def isolated_env(tmp_path, monkeypatch):
+    monkeypatch.setitem(Settings.model_config, "env_file", None)  # never read the developer's .env
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "var"))
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'var' / 'test.db'}")
     monkeypatch.setenv("SLACK_WEBHOOK_URL", "")

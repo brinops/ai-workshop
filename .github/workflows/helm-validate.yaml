@@ -26,7 +26,6 @@ jobs:
     timeout-minutes: 10
     env:
       KUBECONFORM_VERSION: v0.6.7
-      KUBECONFORM_CACHE: ${{ runner.temp }}/kubeconform-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -48,4 +47,6 @@ jobs:
         run: pip install --quiet "pyyaml>=6"
 
       - name: Validate charts (YAML, helm lint, helm template, kubeconform, consistency)
+        env:
+          KUBECONFORM_CACHE: ${{ runner.temp }}/kubeconform-cache
         run: python tools/chart_validator/validate.py demo/charts --format github
