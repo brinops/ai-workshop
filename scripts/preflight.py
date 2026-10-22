@@ -60,7 +60,7 @@ def main() -> int:
     env = load_env()
 
     # --- binaries
-    for b, required in [("git", True), ("gh", True), ("claude", True), ("helm", True), ("kubeconform", True),
+    for b, required in [("just", True), ("git", True), ("gh", True), ("claude", True), ("helm", True), ("kubeconform", True),
                         ("uv", True), ("pnpm", False), ("docker", False)]:
         path = shutil.which(b)
         check(f"binary: {b}", bool(path), path or "not found on PATH", required)
@@ -105,7 +105,7 @@ def main() -> int:
         check("demo scenarios fail for the intended reason", r.returncode == 0,
               " · ".join(ln for ln in r.stdout.splitlines() if ln.startswith(("PASS", "FAIL"))) or r.stderr[-200:])
     else:
-        check("backend virtualenv", False, "run `make install`")
+        check("backend virtualenv", False, "run `just install`")
 
     # --- Slack
     hook = env.get("SLACK_WEBHOOK_URL")
@@ -128,10 +128,10 @@ def main() -> int:
         for name, comp in health["components"].items():
             check(f"  health: {name}", comp["ok"], comp["detail"], required=name in ("database", "worker", "github", "claude"))
         check("dashboard build", (ROOT / "frontend" / "dist" / "index.html").exists(),
-              "frontend/dist present" if (ROOT / "frontend" / "dist" / "index.html").exists() else "run `make build-ui`",
+              "frontend/dist present" if (ROOT / "frontend" / "dist" / "index.html").exists() else "run `just build-ui`",
               required=False)
     except (urllib.error.URLError, OSError) as exc:
-        check("control plane API", False, f"{api} unreachable ({exc}) — run `make dev`")
+        check("control plane API", False, f"{api} unreachable ({exc}) — run `just dev`")
 
     width = max(len(r[1]) for r in results)
     for mark, name, detail, _ in results:

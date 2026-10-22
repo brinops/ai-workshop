@@ -2,9 +2,9 @@
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `make preflight` → worker ✗ "no heartbeat" | API started with `RUN_WORKER=false` and no separate worker | `make worker`, or unset `RUN_WORKER` |
+| `just preflight` → worker ✗ "no heartbeat" | API started with `RUN_WORKER=false` and no separate worker | `just worker`, or unset `RUN_WORKER` |
 | Hook prints nothing after `gh pr create` | hook not loaded (session started before `.claude/settings.json` existed) | restart Claude Code in the repo; check `/hooks` |
-| Hook: "backend unreachable … queued" | API not running | `make dev`, then `python3 .claude/hooks/register_pr.py --flush` |
+| Hook: "backend unreachable … queued" | API not running | `just dev`, then `python3 .claude/hooks/register_pr.py --flush` |
 | Hook: "backend rejected registration (HTTP 401)" | `RCP_API_TOKEN` set on the server but not in the shell running Claude Code | export the same `RCP_API_TOKEN` before starting `claude` |
 | Registration HTTP 502 | backend cannot confirm the PR on GitHub | `gh auth status`; set `GITHUB_TOKEN`; check repo access |
 | Task stuck in `WAITING_CI` | required check name differs, or the workflow doesn't exist on the PR | check run must be named `helm-validate` (or set `REQUIRED_CHECKS`); after `CI_WAIT_TIMEOUT_SECONDS` the task moves to NEEDS_REVIEW |
@@ -19,8 +19,8 @@
 | Slack status "skipped" | `SLACK_WEBHOOK_URL` not set | set it in `.env`, restart |
 | Slack status "failed HTTP 404 no_service" | webhook revoked | create a new Incoming Webhook |
 | kubeconform `TOOL_ERROR` locally | no network to download schemas | run once online; schemas are cached in `var/kubeconform-cache` |
-| Dashboard blank on :8000 | UI not built | `make build-ui` (or use `make dev-ui` on :5173) |
-| "database is locked" | two API processes on the same `DATA_DIR` | run one API; use `RUN_WORKER=false` + `make worker` to split |
+| Dashboard blank on :8000 | UI not built | `just build-ui` (or use `just dev-ui` on :5173) |
+| "database is locked" | two API processes on the same `DATA_DIR` | run one API; use `RUN_WORKER=false` + `just worker` to split |
 
 ## Where to look
 
@@ -28,4 +28,4 @@
 * **Agent logs tab**: each tool call the agent made, permission denials, cost, turns.
 * `var/runs/task-<id>/analysis-<run>/`: the exact evidence bundle the agent saw (context.json, ci-log.txt, pr.diff).
 * `var/rcp.db`: `sqlite3 var/rcp.db 'select id,state,resolution,last_error from tasks'`.
-* API logs from `make dev` (structured `rcp.*` loggers).
+* API logs from `just dev` (structured `rcp.*` loggers).

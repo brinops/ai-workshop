@@ -18,7 +18,7 @@
 | One validator for CI, backend and agent | Local and remote validation cannot drift; deterministic categories come from one place |
 | Agents loaded from operator checkout, PR mounted via `--add-dir` | A malicious PR cannot rewrite the skill/agent definitions |
 | Hand-written shadcn-style components on Radix | Same look and accessibility as shadcn/ui without the generator step |
-| Primary run mode is local (`make dev`); Docker Compose provided | Claude Code OAuth lives in the macOS keychain; containers need `ANTHROPIC_API_KEY`/`CLAUDE_CODE_OAUTH_TOKEN` |
+| Primary run mode is local (`just dev`); Docker Compose provided | Claude Code OAuth lives in the macOS keychain; containers need `ANTHROPIC_API_KEY`/`CLAUDE_CODE_OAUTH_TOKEN` |
 
 ## Phase 1 — Backend foundation
 SQLAlchemy models + Alembic migration, settings, state machine with transition table, registration service

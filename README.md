@@ -80,19 +80,20 @@ scripts/preflight.py    environment & integration preflight
 
 ## Quick start (local — recommended)
 
-Requirements: Python 3.12 + [uv](https://docs.astral.sh/uv/), Node 22+ + pnpm, git, `gh`, `helm`, `kubeconform`,
+Requirements: [just](https://just.systems), Python 3.12 + [uv](https://docs.astral.sh/uv/), Node 22+ + pnpm, git, `gh`, `helm`, `kubeconform`,
 Claude Code (`claude`) logged in.
 
 ```bash
-brew install helm kubeconform gh uv pnpm     # macOS
+brew install just helm kubeconform gh uv pnpm   # macOS
 cp .env.example .env                          # set SLACK_WEBHOOK_URL
-make install                                  # uv sync + pnpm install
-make build-ui                                 # dashboard → frontend/dist
-make dev                                      # API + worker + UI on http://localhost:8000
-make preflight                                # in another terminal
+just install                                  # uv sync + pnpm install
+just build-ui                                 # dashboard → frontend/dist
+just dev                                      # API + worker + UI on http://localhost:8000
+just preflight                                # in another terminal
 ```
 
-UI development with hot reload: `make dev` + `make dev-ui` → http://localhost:5173.
+Run `just` to list all recipes. Set `PORT` in `.env` if :8000 is taken (also set `PUBLIC_URL` to match —
+the hook posts there). UI development with hot reload: `just dev` + `just dev-ui` → http://localhost:5173.
 
 ### Docker Compose
 
@@ -156,7 +157,7 @@ Run `/hooks` inside Claude Code to confirm it is loaded.
 | Auto Remediate | diagnosis waits for **Start Remediation** | remediation starts after a remediable diagnosis |
 | Auto Push | validated fix waits for **Approve Push** (default) | fix is pushed immediately |
 
-`make autonomous` / `make safe` switch presets from the terminal; the dashboard has the same toggles.
+`just autonomous` / `just safe` switch presets from the terminal; the dashboard has the same toggles.
 The control plane **never merges** a PR.
 
 ## Demo scenarios
@@ -168,9 +169,9 @@ The control plane **never merges** a PR.
 | C | `service.targetPort: 9090` while the app listens on `app.port: 8080` | consistency check | `LOGICAL_CONFIGURATION_ERROR` |
 
 ```bash
-make scenarios            # proves each scenario fails for the intended reason (and only that reason)
-make scenario S=C         # new branch from origin/main + error + push; prints the gh pr create command
-make dry-run S=C          # rehearse both agents locally without GitHub (costs ~$0.40)
+just scenarios            # proves each scenario fails for the intended reason (and only that reason)
+just scenario C         # new branch from origin/main + error + push; prints the gh pr create command
+just dry-run C          # rehearse both agents locally without GitHub (costs ~$0.40)
 ```
 
 Each run creates a fresh, timestamped branch, so scenarios are independently repeatable.
@@ -178,8 +179,8 @@ Each run creates a fresh, timestamped branch, so scenarios are independently rep
 ## Testing
 
 ```bash
-make test     # backend pytest (fakes for GitHub/agents/Slack + real helm/kubeconform) and frontend vitest
-make lint
+just test     # backend pytest (fakes for GitHub/agents/Slack + real helm/kubeconform) and frontend vitest
+just lint
 ```
 
 ## Safety summary

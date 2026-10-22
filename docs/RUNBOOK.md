@@ -6,11 +6,11 @@ deterministic consistency check plus contextual reasoning find and fix the bug.
 
 ## T–1 day
 
-1. `make install && make build-ui`
+1. `just install && just build-ui`
 2. `cp .env.example .env`, set `SLACK_WEBHOOK_URL` (and `PUBLIC_URL` if the dashboard is reachable elsewhere).
 3. Make sure `main` contains the chart, validator and `.github/workflows/helm-validate.yaml`
-   (`make preflight` checks this).
-4. Rehearse the agents without GitHub: `make dry-run S=C` (≈2 min, ≈$0.40). Expect
+   (`just preflight` checks this).
+4. Rehearse the agents without GitHub: `just dry-run C` (≈2 min, ≈$0.40). Expect
    `classification=LOGICAL_CONFIGURATION_ERROR … remediable=True` and `local validation after fix: VALID`.
 5. Run one full rehearsal of the flow below and delete the rehearsal PR afterwards
    (`gh pr close <n> --delete-branch`).
@@ -18,8 +18,8 @@ deterministic consistency check plus contextual reasoning find and fix the bug.
 ## T–15 minutes
 
 ```bash
-make dev                         # terminal 1 — API + worker + dashboard on :8000
-make preflight                   # terminal 2 — every required check must be ✓
+just dev                         # terminal 1 — API + worker + dashboard on :8000
+just preflight                   # terminal 2 — every required check must be ✓
 python3 scripts/preflight.py --live --slack   # optional: real Claude call + Slack test message
 ```
 
@@ -32,7 +32,7 @@ Open http://localhost:8000, switch on **Presentation mode**, and choose the auto
 
 | # | You do | Audience sees |
 |---|---|---|
-| 1 | In terminal 2: `make scenario S=C` | branch `demo/logical-error-<ts>` pushed; validator output proves it fails for the intended reason |
+| 1 | In terminal 2: `just scenario C` | branch `demo/logical-error-<ts>` pushed; validator output proves it fails for the intended reason |
 | 2 | Start Claude Code in the repo (`claude`) and ask: *"Open a PR for branch demo/logical-error-… using the gh command printed above."* Claude runs `gh pr create …` | Claude Code prints `[Remediation Control Plane] PR #N registered as task K` (PostToolUse hook) |
 | 3 | Switch to the dashboard | task card appears in **NEW** → `WAITING_CI`, "Waiting for GitHub Actions: helm-validate" |
 | 4 | Open the PR on GitHub (link on the card) | the real `helm-validate` check runs and fails (~40 s) with an annotation on `service.yaml` |
@@ -51,19 +51,19 @@ overridden whenever deterministic evidence disagrees.
 
 ## Variations
 
-* **Scenario A** (`make scenario S=A`) — syntax error: shows deterministic YAML parse evidence.
-* **Scenario B** (`make scenario S=B`) — schema violation: kubeconform output in the CI log.
+* **Scenario A** (`just scenario A`) — syntax error: shows deterministic YAML parse evidence.
+* **Scenario B** (`just scenario B`) — schema violation: kubeconform output in the CI log.
 * **Manual gates** — turn off Auto Analyze to show *Analyze Now*; turn off Auto Remediate for *Start Remediation*.
 * **Pause / Cancel** — pause a task in `ANALYZING`: the running agent finishes, nothing further starts until *Resume*.
   *Cancel* stops the running agent process immediately.
-* **Crash recovery** — stop `make dev` (Ctrl-C) during `IN_PROGRESS`, start it again: the task is recovered and the
+* **Crash recovery** — stop `just dev` (Ctrl-C) during `IN_PROGRESS`, start it again: the task is recovered and the
   stage re-runs from a fresh worktree (timeline shows "Recovered …").
 
 ## Reset between sessions
 
 ```bash
-gh pr list --search "head:demo/" --json number -q '.[].number' | xargs -n1 -I{} gh pr close {} --delete-branch
-make reset-db        # optional: clears the dashboard history
+just reset-prs       # close demo PRs and delete their branches
+just reset-db        # optional: clears the dashboard history
 ```
 
 ## If something goes wrong on stage

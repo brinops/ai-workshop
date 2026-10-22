@@ -28,7 +28,7 @@ export function EmptyBoard() {
             </span>
             <div>
               <p className="font-medium">Or prepare a workshop scenario</p>
-              <pre className="mt-1.5 inline-block rounded-md border border-line bg-panel px-3 py-1.5 font-mono text-sm">make scenario S=A</pre>
+              <pre className="mt-1.5 inline-block rounded-md border border-line bg-panel px-3 py-1.5 font-mono text-sm">just scenario A</pre>
               <p className="mt-1.5 text-sm text-muted">
                 It pushes a branch with a broken chart and prints the <code className="font-mono">gh pr create</code> command to run
                 from Claude Code.
