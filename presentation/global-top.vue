@@ -9,14 +9,14 @@ const page = computed(() => $page?.value || currentPage.value)
 
 const chapters = [
   { n: '01', name: 'The Problem', from: 1, to: 3 },
-  { n: '02', name: 'Claude Code Hooks', from: 4, to: 7 },
-  { n: '03', name: 'Headless Agents & Skills', from: 8, to: 10 },
-  { n: '04', name: 'Architecture & Guardrails', from: 11, to: 13 },
-  { n: '05', name: 'Live Demo', from: 14, to: 15 },
-  { n: '06', name: 'Build Your Own', from: 16, to: 17 },
+  { n: '02', name: 'Claude Code Hooks', from: 4, to: 11 },
+  { n: '03', name: 'Headless Agents & Skills', from: 12, to: 14 },
+  { n: '04', name: 'Architecture & Guardrails', from: 15, to: 17 },
+  { n: '05', name: 'Live Demo', from: 18, to: 19 },
+  { n: '06', name: 'Build Your Own', from: 20, to: 21 },
 ]
 // Slides that own the whole canvas and should not show the footer.
-const bare = new Set([1, 15])
+const bare = new Set([1, 19])
 
 const current = computed(() => chapters.find(c => page.value >= c.from && page.value <= c.to))
 </script>

@@ -198,6 +198,87 @@ clicks: 2
 
 Окрім command-хуків, є типи http, prompt (одноразова оцінка LLM), agent (субагент-перевіряльник, експериментальний) і mcp_tool.
 
+Перехід: «Далі — повний каталог: усі 33 події на чотирьох слайдах».
+-->
+
+---
+
+<div class="eyebrow">02 · Hook events · 1 of 4</div>
+
+# Session & environment
+
+<HookCatalog :group="1" />
+
+<!--
+Каталог 1/4 — події сесії та середовища. Ці слайди довідкові: можна пройти швидко, зупиняючись на 1–2 подіях.
+
+- SessionStart — найпопулярніший: підкинути контекст на старті.
+- Setup — тільки для `--init-only` або `--init`/`--maintenance` у `-p` режимі: одноразова підготовка в CI.
+- InstructionsLoaded — бачимо, які CLAUDE.md / rules реально потрапили в контекст. Exit code ігнорується.
+- ConfigChange — може заблокувати зміну settings / skills посеред сесії (крім policy_settings). Захист від агента, який сам собі розширює права.
+- CwdChanged, DirectoryAdded, FileChanged — реактивне середовище (direnv, .env).
+- SessionEnd — прибирання; заблокувати вихід не може.
+-->
+
+---
+
+<div class="eyebrow">02 · Hook events · 2 of 4</div>
+
+# Prompts & tool calls
+
+<HookCatalog :group="2" />
+
+<!--
+Каталог 2/4 — промпти та виклики інструментів. Тут живе більшість «захисних» хуків.
+
+- UserPromptSubmit — може заблокувати промпт або додати контекст, але НЕ переписати його.
+- UserPromptExpansion — коли /команда розгортається в промпт.
+- PreToolUse — головний gate: allow / deny / ask / defer + updatedInput.
+- PermissionRequest — відповідає на діалог дозволу; exit 2 тут не працює, тільки decision object.
+- PermissionDenied — auto mode відхилив виклик; `retry: true` дозволяє моделі спробувати ще раз.
+- PostToolUse — наш хук. Інструмент уже виконався: лише фідбек або заміна виводу (updatedToolOutput).
+- PostToolUseFailure — те саме для невдалих викликів.
+- PostToolBatch — після пачки паралельних викликів, перед наступним викликом моделі; block зупиняє цикл.
+- MessageDisplay — змінює лише те, що бачить людина на екрані; модель бачить оригінал.
+-->
+
+---
+
+<div class="eyebrow">02 · Hook events · 3 of 4</div>
+
+# Turn end, subagents & teams
+
+<HookCatalog :group="3" />
+
+<!--
+Каталог 3/4 — завершення ходу, субагенти, задачі та agent teams.
+
+- Stop / SubagentStop — `decision: "block"` змушує продовжувати: класичний патерн «не зупиняйся, поки тести не зелені».
+- StopFailure — хід обірвався через помилку API (rate_limit, overloaded, billing…). Вивід ігнорується — тільки сповіщення.
+- SubagentStart — додати контекст субагенту при старті (matcher — тип агента).
+- TaskCreated / TaskCompleted — хуки на інструменти TaskCreate / TaskUpdate: можна скасувати створення задачі або не дати позначити її виконаною.
+- TeammateIdle — для agent teams: не дати тіммейту «заснути», поки є робота.
+-->
+
+---
+
+<div class="eyebrow">02 · Hook events · 4 of 4</div>
+
+# Context, models, MCP & worktrees
+
+<HookCatalog :group="4" />
+
+<!--
+Каталог 4/4 — контекст, моделі, MCP, worktrees і сповіщення.
+
+- PreCompact може заблокувати компакцію; PostCompact — лише спостерігає.
+- PreModelSwitch — allow / deny / ask на зміну моделі; PostModelSwitch — після зміни, включно з автоматичною при resume.
+- Elicitation / ElicitationResult — коли MCP-сервер просить у користувача дані: хук може відповісти сам, відхилити або перевірити відповідь. Корисно в headless, де людини немає.
+- WorktreeCreate ЗАМІНЮЄ стандартну git-поведінку: хук сам створює каталог і повертає шлях. WorktreeRemove — прибирає те, що він створив.
+- Notification — побічні ефекти: пінг у Slack, коли агент чекає.
+
+Крім command-хуків є http, prompt, agent (експериментальний) і mcp_tool.
+
 Перехід: «Повернімося до нашого PostToolUse і простежимо один PR».
 -->
 

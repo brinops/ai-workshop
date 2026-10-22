@@ -79,7 +79,7 @@ const kindLabel: Record<Kind, string> = { gate: 'can block', loop: 'can continue
 
     <div class="legend" :class="{ on: step >= 1 }">
       <span v-for="(label, k) in kindLabel" :key="k" class="lg" :class="k"><span class="dot" />{{ label }}</span>
-      <span class="more mono">+ 20 more events · handler types: command · http · prompt · agent · mcp_tool</span>
+      <span class="more mono">+ 23 more events on the next slides · handler types: command · http · prompt · agent · mcp_tool</span>
     </div>
   </div>
 </template>
