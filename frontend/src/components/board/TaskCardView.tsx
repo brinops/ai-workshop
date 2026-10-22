@@ -1,4 +1,4 @@
-import { AlertTriangle, GitBranch, Hand, Rocket, Route, Sparkles, Wrench } from "lucide-react";
+import { AlertTriangle, Coins, GitBranch, Hand, Rocket, Route, Sparkles, Wrench } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
-import { relativeTime, shortSha } from "@/lib/format";
+import { formatCost, relativeTime, shortSha } from "@/lib/format";
 import { PENDING_ACTION_COPY, resolutionLabel } from "@/lib/states";
 import { cn } from "@/lib/utils";
 import type { TaskCard } from "@/services/api";
@@ -98,6 +98,14 @@ export function TaskCardView({ task, now, selected }: { task: TaskCard; now: num
         {task.attempt > 0 && (
           <Badge tone="neutral" title="Remediation attempts used">
             attempt {task.attempt}/{task.max_attempts}
+          </Badge>
+        )}
+        {task.agent_runs > 0 && (
+          <Badge
+            tone="neutral"
+            title={`Agent cost reported by Claude Code across ${task.agent_runs} run(s) — list-price estimate`}
+          >
+            <Coins aria-hidden /> {formatCost(task.cost_usd)} · {task.agent_runs} run{task.agent_runs === 1 ? "" : "s"}
           </Badge>
         )}
         {task.paused && <PausedBadge />}

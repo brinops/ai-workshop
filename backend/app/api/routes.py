@@ -54,12 +54,24 @@ from app.services.settings_store import Automation, get_automation, update_autom
 router = APIRouter(prefix="/api")
 
 
-def card(t: Task) -> TaskCard:
+def agent_spend(db: Session, task_ids: list[int]) -> dict[int, tuple[float, int]]:
+    """Total agent cost (USD, as reported by Claude Code) and number of agent runs per task."""
+    if not task_ids:
+        return {}
+    rows = db.execute(
+        select(AgentRun.task_id, func.coalesce(func.sum(AgentRun.cost_usd), 0.0), func.count(AgentRun.id))
+        .where(AgentRun.task_id.in_(task_ids)).group_by(AgentRun.task_id)
+    ).all()
+    return {tid: (float(cost), int(n)) for tid, cost, n in rows}
+
+
+def card(t: Task, spend: tuple[float, int] | None = None) -> TaskCard:
     now = utcnow()
     running = bool(t.lease_owner and t.lease_expires_at and t.lease_expires_at > now
                    and t.state in (TaskState.ANALYZING, TaskState.IN_PROGRESS))
     return TaskCard.model_validate({**{c: getattr(t, c) for c in TaskCard.model_fields if hasattr(t, c)},
-                                    "column": COLUMN_OF[TaskState(t.state)], "agent_running": running})
+                                    "column": COLUMN_OF[TaskState(t.state)], "agent_running": running,
+                                    "cost_usd": (spend or (None, 0))[0], "agent_runs": (spend or (None, 0))[1]})
 
 
 def _check_token(authorization: str | None) -> None:
@@ -126,10 +138,11 @@ async def github_webhook(request: Request, db: Session = Depends(get_db)) -> dic
 @router.get("/board", response_model=Board)
 def board(db: Session = Depends(get_db)) -> Board:
     tasks = db.scalars(select(Task).order_by(Task.updated_at.desc())).all()
+    spend = agent_spend(db, [t.id for t in tasks])
     columns: dict[str, list[TaskCard]] = {c.value: [] for c in Column}
     state_counts: dict[str, int] = {s.value: 0 for s in TaskState}
     for t in tasks:
-        columns[COLUMN_OF[TaskState(t.state)]].append(card(t))
+        columns[COLUMN_OF[TaskState(t.state)]].append(card(t, spend.get(t.id)))
         state_counts[t.state] += 1
     return Board(columns=columns, counts={k: len(v) for k, v in columns.items()}, state_counts=state_counts)
 
@@ -139,7 +152,9 @@ def list_tasks(state: TaskState | None = None, db: Session = Depends(get_db)) ->
     q = select(Task).order_by(Task.updated_at.desc())
     if state:
         q = q.where(Task.state == state)
-    return [card(t) for t in db.scalars(q).all()]
+    tasks = db.scalars(q).all()
+    spend = agent_spend(db, [t.id for t in tasks])
+    return [card(t, spend.get(t.id)) for t in tasks]
 
 
 def _task_or_404(db: Session, task_id: int) -> Task:
@@ -157,7 +172,7 @@ def task_detail(task_id: int, db: Session = Depends(get_db)) -> TaskDetail:
         return db.scalars(select(model).where(model.task_id == task_id).order_by(order or model.id)).all()
 
     return TaskDetail(
-        task=card(t),
+        task=card(t, agent_spend(db, [t.id]).get(t.id)),
         actions=[a.value for a in actions_svc.available_actions(db, t)],
         events=[EventOut.model_validate(e) for e in rows(Event)],
         comments=[CommentOut.model_validate(c) for c in rows(Comment)],
@@ -185,7 +200,7 @@ def task_action(task_id: int, action: actions_svc.Action, db: Session = Depends(
     except actions_svc.ActionError as exc:
         raise HTTPException(409, str(exc)) from exc
     db.flush()
-    return ActionOut(ok=True, message=message, task=card(t))
+    return ActionOut(ok=True, message=message, task=card(t, agent_spend(db, [t.id]).get(t.id)))
 
 
 @router.get("/events", response_model=list[EventOut])

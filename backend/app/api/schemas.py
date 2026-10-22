@@ -66,6 +66,8 @@ class TaskCard(_Out):
     max_attempts: int
     activity: str | None
     agent_running: bool
+    cost_usd: float | None  # sum of agent runs, as reported by Claude Code (list-price estimate)
+    agent_runs: int
     last_error: str | None
     created_at: datetime
     updated_at: datetime

@@ -67,6 +67,9 @@ export interface TaskCard {
   max_attempts: number;
   activity: string | null;
   agent_running: boolean;
+  /** Sum of agent runs as reported by Claude Code (list-price estimate), null if no agent ran. */
+  cost_usd: number | null;
+  agent_runs: number;
   last_error: string | null;
   created_at: string;
   updated_at: string;
