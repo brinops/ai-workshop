@@ -2,7 +2,7 @@
 
 A Slidev keynote for the AI Remediation Control Plane workshop:
 **Claude Code Hooks, Headless Agents, Skills & Validation Gates**.
-16 slides, 6 chapters, ~25 min of talk + a 10–15 min live demo.
+17 slides, 6 chapters, ~25 min of talk + a 10–15 min live demo.
 
 The deck is self-contained: it needs no backend, no network and no external
 images (fonts are bundled through `@fontsource`).
@@ -70,7 +70,7 @@ Canvas is 1280×720 (16:9) and scales to 1920×1080 and other sizes.
 ## Technical accuracy
 
 Claude Code behaviour shown in the deck was checked against code.claude.com
-(hooks, skills, sub-agents, headless) and `claude --help` v2.1.308. Code on slides 6 and 8 is
-excerpted from this repository's `.claude/` directory; validator findings on slide 13 are the
-real output of `demo/scripts/scenario.py verify all`. The terminal output on slide 7 is
+(hooks, skills, sub-agents, headless) and `claude --help` v2.1.308. Code on slides 7 and 9 is
+excerpted from this repository's `.claude/` directory; validator findings on slide 14 are the
+real output of `demo/scripts/scenario.py verify all`. The terminal output on slide 8 is
 labelled as illustrative.
