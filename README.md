@@ -10,6 +10,7 @@ A developer opens a PR from Claude Code → a Claude Code **hook** registers it 
 same PR → GitHub Actions re-runs → the task moves to **DONE** and **Slack** receives a summary. Every step is
 visible live on a Kanban dashboard.
 
+- How it works, step by step (what is written to the DB, who decides what): [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)
 - Architecture & security boundaries: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Workshop runbook (step-by-step live demo): [docs/RUNBOOK.md](docs/RUNBOOK.md)
 - Troubleshooting: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
