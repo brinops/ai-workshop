@@ -1,0 +1,40 @@
+/* Design tokens — the single source for colour, type and spacing. */
+:root {
+  --bg: #09090f;
+  --bg-deep: #050508;
+  --surface: #14141f;
+  --surface-2: #1b1b2a;
+  --surface-3: #232336;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #f5f5f7;
+  --muted: #9ca3af;
+  --faint: #5b5f6e;
+
+  --violet: #8b5cf6;
+  --violet-soft: rgba(139, 92, 246, 0.16);
+  --indigo: #6366f1;
+  --indigo-soft: rgba(99, 102, 241, 0.16);
+  --ok: #22c55e;
+  --ok-soft: rgba(34, 197, 94, 0.14);
+  --warn: #f59e0b;
+  --warn-soft: rgba(245, 158, 11, 0.14);
+  --fail: #ef4444;
+  --fail-soft: rgba(239, 68, 68, 0.14);
+
+  --grad-accent: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 40%, #6366f1 100%);
+  --glow-violet: 0 0 0 1px rgba(139, 92, 246, 0.45), 0 0 32px rgba(139, 92, 246, 0.28);
+  --glow-ok: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 0 28px rgba(34, 197, 94, 0.25);
+  --glow-fail: 0 0 0 1px rgba(239, 68, 68, 0.5), 0 0 28px rgba(239, 68, 68, 0.25);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 20px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 480ms;
+}
