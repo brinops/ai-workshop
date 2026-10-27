@@ -1,6 +1,6 @@
 # From Broken PR to Autonomous Recovery
 
-A Slidev keynote for the AI Remediation Control Plane workshop:
+A Slidev keynote for the CI Control Plane workshop:
 **Claude Code Hooks, Headless Agents, Skills & Validation Gates**.
 21 slides, 6 chapters, ~25 min of talk + a 10–15 min live demo.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code PostToolUse hook: register PRs created with `gh pr create` in the Remediation Control Plane.
+"""Claude Code PostToolUse hook: register PRs created with `gh pr create` in the CI Control Plane.
 
 Behaviour
   * Fires on every Bash tool use (matcher "Bash") but acts only when the command contains `gh pr create`
@@ -160,8 +160,8 @@ def flush() -> list[str]:
 
 def emit(message: str) -> None:
     print(json.dumps({
-        "systemMessage": f"[Remediation Control Plane] {message}",
-        "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": f"Remediation Control Plane: {message}"},
+        "systemMessage": f"[CI Control Plane] {message}",
+        "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": f"CI Control Plane: {message}"},
     }))
 
 
@@ -209,7 +209,7 @@ def main(argv: list[str]) -> int:
         raw = sys.stdin.read()
         handle_hook(json.loads(raw) if raw.strip() else {})
     except Exception as exc:  # the hook must never break the developer's session
-        print(json.dumps({"systemMessage": f"[Remediation Control Plane] hook error ignored: {exc}"}))
+        print(json.dumps({"systemMessage": f"[CI Control Plane] hook error ignored: {exc}"}))
     return 0
 
 

@@ -1,4 +1,4 @@
-# AI Remediation Control Plane
+# CI Control Plane
 
 A working, end-to-end demonstration of autonomous remediation of broken Kubernetes / Helm configuration:
 

@@ -121,7 +121,7 @@ def main() -> int:
     hook = env.get("SLACK_WEBHOOK_URL")
     check("Slack webhook configured", bool(hook), "SLACK_WEBHOOK_URL set" if hook else "set SLACK_WEBHOOK_URL in .env")
     if args.slack and hook:
-        req = urllib.request.Request(hook, data=json.dumps({"text": ":wave: Remediation Control Plane preflight"}).encode(),
+        req = urllib.request.Request(hook, data=json.dumps({"text": ":wave: CI Control Plane preflight"}).encode(),
                                      headers={"Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:

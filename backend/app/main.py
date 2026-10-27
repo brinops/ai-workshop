@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     s = get_settings()
-    app = FastAPI(title="AI Remediation Control Plane", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="CI Control Plane", version="0.1.0", lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["*"], allow_headers=["*"])
     app.include_router(routes.router)
     app.include_router(stream.router)
