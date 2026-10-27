@@ -5,6 +5,7 @@ set dotenv-load
 
 py := "backend/.venv/bin/python"
 port := env("PORT", "8000")
+host := env("API_HOST", "127.0.0.1")
 api := "http://127.0.0.1:" + port
 export KUBECONFORM_CACHE := env("KUBECONFORM_CACHE", justfile_directory() / "var/kubeconform-cache")
 
@@ -21,9 +22,9 @@ install:
 build-ui:
     cd frontend && pnpm build
 
-# Run API + worker + built dashboard on 127.0.0.1:$PORT (default 8000)
+# Run API + worker + built dashboard on $API_HOST:$PORT (default 127.0.0.1:8000)
 dev:
-    cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port {{port}}
+    cd backend && uv run uvicorn app.main:app --host {{host}} --port {{port}}
 
 # Run the Vite dev server on :5173 (proxies /api to the backend)
 dev-ui:
