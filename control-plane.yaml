@@ -1,4 +1,4 @@
-# AI Remediation Control Plane — which repositories are watched and who handles which failure.
+# CI Control Plane — which repositories are watched and who handles which failure.
 #
 # Domain knowledge lives in the standard .claude/ layout:
 #   .claude/skills/<analysis_skill>/SKILL.md      Analysis Skill (+ scripts/ such as the validator)

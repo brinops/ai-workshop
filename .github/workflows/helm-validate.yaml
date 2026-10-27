@@ -1,4 +1,4 @@
-# Required check for the AI Remediation Control Plane.
+# Required check for the CI Control Plane.
 # The check run is named `helm-validate` (job id) — keep REQUIRED_CHECKS in sync.
 name: Helm validation
 

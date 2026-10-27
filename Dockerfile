@@ -1,4 +1,4 @@
-# AI Remediation Control Plane — single container: API + worker + built dashboard.
+# CI Control Plane — single container: API + worker + built dashboard.
 # Claude Code inside a container cannot use the macOS keychain login: provide ANTHROPIC_API_KEY
 # or CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) and GITHUB_TOKEN via the environment.
 

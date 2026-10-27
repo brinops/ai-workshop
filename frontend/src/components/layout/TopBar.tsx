@@ -111,7 +111,7 @@ export function TopBar({
               <path d="M7 17l6 6L25 9" fill="none" stroke="var(--accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
-          <h1 className="truncate text-[0.98rem] font-semibold tracking-tight">AI Remediation Control Plane</h1>
+          <h1 className="truncate text-[0.98rem] font-semibold tracking-tight">CI Control Plane</h1>
         </div>
 
         <div className="ml-auto flex items-center gap-3">

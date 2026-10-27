@@ -1,7 +1,7 @@
 [project]
 name = "rcp-backend"
 version = "0.1.0"
-description = "AI Remediation Control Plane — backend"
+description = "CI Control Plane — backend"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

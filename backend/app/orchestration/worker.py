@@ -743,7 +743,7 @@ class Worker:
             message = (f"fix: {output.summary[:68].rstrip('.')}\n\n"
                        f"{output.rationale.strip()}\n\nClassification: {diagnosis['classification']}\n"
                        f"Route: {route.check} → {route.remediation_agent}\n"
-                       f"Remediation-Task: {tid} (attempt {snap['attempt']})\nGenerated-By: AI Remediation Control Plane")
+                       f"Remediation-Task: {tid} (attempt {snap['attempt']})\nGenerated-By: CI Control Plane")
             commit_sha = await self.deps.worktrees.commit(worktree, message)
         else:
             await self.deps.worktrees.remove(repo, worktree)

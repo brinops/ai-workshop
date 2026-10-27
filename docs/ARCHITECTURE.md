@@ -1,4 +1,4 @@
-# AI Remediation Control Plane — Architecture
+# CI Control Plane — Architecture
 
 ## 1. Goal
 

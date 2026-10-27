@@ -3,7 +3,7 @@ theme: default
 title: From Broken PR to Autonomous Recovery
 info: |
   Claude Code Hooks, Headless Agents, Skills & Validation Gates.
-  A developer-conference keynote about the AI Remediation Control Plane.
+  A developer-conference keynote about the CI Control Plane.
 author: Bohdan Rebrov
 colorSchema: dark
 canvasWidth: 1280

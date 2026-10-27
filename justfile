@@ -1,4 +1,4 @@
-# AI Remediation Control Plane — task runner (https://just.systems)
+# CI Control Plane — task runner (https://just.systems)
 # `just` lists recipes. Variables come from the environment or .env (e.g. PORT=8077).
 
 set dotenv-load

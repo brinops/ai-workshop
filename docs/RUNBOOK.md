@@ -33,7 +33,7 @@ Open http://localhost:8000, switch on **Presentation mode**, and choose the auto
 | # | You do | Audience sees |
 |---|---|---|
 | 1 | In terminal 2: `just scenario C` | branch `demo/logical-error-<ts>` pushed; validator output proves it fails for the intended reason |
-| 2 | Start Claude Code in the repo (`claude`) and ask: *"Open a PR for branch demo/logical-error-… using the gh command printed above."* Claude runs `gh pr create …` | Claude Code prints `[Remediation Control Plane] PR #N registered as task K` (PostToolUse hook) |
+| 2 | Start Claude Code in the repo (`claude`) and ask: *"Open a PR for branch demo/logical-error-… using the gh command printed above."* Claude runs `gh pr create …` | Claude Code prints `[CI Control Plane] PR #N registered as task K` (PostToolUse hook) |
 | 3 | Switch to the dashboard | task card appears in **NEW** → `WAITING_CI`, "Waiting for GitHub Actions: helm-validate" |
 | 4 | Open the PR on GitHub (link on the card) | the real `helm-validate` check runs and fails (~40 s) with an annotation on `service.yaml` |
 | 5 | Dashboard | `ANALYZING` — the agent log streams tool calls (Skill → Read context.json → ci-log → diff → values.yaml → templates) |

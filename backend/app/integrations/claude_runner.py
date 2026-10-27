@@ -110,7 +110,7 @@ def build_command(spec: AgentSpec) -> list[str]:
         cmd += ["--agent", spec.agent]
     # Agents run unattended for a machine consumer: pin the language and the result channel,
     # regardless of the operator's personal memory/preferences.
-    append = ("You are running headless inside the AI Remediation Control Plane. Write all prose in English. "
+    append = ("You are running headless inside the CI Control Plane. Write all prose in English. "
               "Always finish by calling the StructuredOutput tool with your result.")
     if spec.system_prompt_append:
         append += "\n" + spec.system_prompt_append
