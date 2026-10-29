@@ -1,0 +1,835 @@
+{
+  "task": {
+    "id": 14,
+    "repo": "brinops/ai-workshop",
+    "pr_number": 16,
+    "pr_url": "https://github.com/brinops/ai-workshop/pull/16",
+    "title": "Expose payments-api metrics port on the Service",
+    "author": "bohdan-rebrov",
+    "head_branch": "demo/logical-error-20261029-084423",
+    "base_branch": "main",
+    "head_sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+    "expected_sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+    "source": "hook",
+    "route": "helm-validate",
+    "state": "DONE",
+    "column": "DONE",
+    "pending_action": null,
+    "paused": false,
+    "cancel_requested": false,
+    "resolution": "remediated",
+    "classification": "LOGICAL_CONFIGURATION_ERROR",
+    "confidence": 0.93,
+    "root_cause": "In demo/charts/payments-api/values.yaml, the PR changed `service.targetPort` from 8080 to 9090, but the Deployment only exposes container port 8080 (`app.port`, named `http`). The Service therefore routes to a port nothing listens on and would drop traffic.",
+    "ci_status": "success",
+    "ci_checked_at": "2026-10-29T06:48:33Z",
+    "ci_waiting_since": "2026-10-29T06:48:16Z",
+    "ci_next_check_at": "2026-10-29T06:48:48Z",
+    "attempt": 1,
+    "max_attempts": 2,
+    "activity": null,
+    "agent_running": false,
+    "cost_usd": 0.3450023,
+    "agent_runs": 2,
+    "last_error": null,
+    "created_at": "2026-10-29T06:44:38Z",
+    "updated_at": "2026-10-29T06:48:33Z"
+  },
+  "actions": [],
+  "events": [
+    {
+      "id": 203,
+      "task_id": 14,
+      "ts": "2026-10-29T06:44:38Z",
+      "type": "registered",
+      "level": "success",
+      "message": "PR #16 registered via hook (demo/logical-error-20261029-084423 @ 83d7e6e)",
+      "data": {
+        "source": "hook",
+        "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4"
+      }
+    },
+    {
+      "id": 204,
+      "task_id": 14,
+      "ts": "2026-10-29T06:44:38Z",
+      "type": "state_changed",
+      "level": "info",
+      "message": "NEW → WAITING_CI: waiting for GitHub Actions",
+      "data": {
+        "from": "NEW",
+        "to": "WAITING_CI"
+      }
+    },
+    {
+      "id": 205,
+      "task_id": 14,
+      "ts": "2026-10-29T06:44:43Z",
+      "type": "ci_status",
+      "level": "info",
+      "message": "CI on 83d7e6e: pending (helm-validate=pending)",
+      "data": {
+        "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+        "overall": "pending",
+        "checks": [
+          {
+            "name": "helm-validate",
+            "verdict": "pending",
+            "conclusion": null,
+            "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535"
+          }
+        ]
+      }
+    },
+    {
+      "id": 206,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:00Z",
+      "type": "ci_status",
+      "level": "error",
+      "message": "CI on 83d7e6e: failure (helm-validate=failure)",
+      "data": {
+        "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+        "overall": "failure",
+        "checks": [
+          {
+            "name": "helm-validate",
+            "verdict": "failure",
+            "conclusion": "failure",
+            "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535"
+          }
+        ]
+      }
+    },
+    {
+      "id": 207,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:00Z",
+      "type": "route_selected",
+      "level": "info",
+      "message": "Route helm-validate → skill k8s-failure-analysis, agent k8s-remediator",
+      "data": {
+        "check": "helm-validate",
+        "analysis_skill": "k8s-failure-analysis",
+        "remediation_agent": "k8s-remediator",
+        "validator": ".claude/skills/k8s-failure-analysis/scripts/validate.py",
+        "allowed_paths": [
+          "demo/charts/**"
+        ],
+        "max_changed_lines": 40,
+        "max_attempts": 2
+      }
+    },
+    {
+      "id": 208,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:00Z",
+      "type": "awaiting_approval",
+      "level": "warning",
+      "message": "CI failed. Auto Analyze is off — waiting for “Analyze Now”",
+      "data": null
+    },
+    {
+      "id": 209,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:04Z",
+      "type": "state_changed",
+      "level": "info",
+      "message": "WAITING_CI → ANALYZING: “Analyze Now” by dashboard",
+      "data": {
+        "from": "WAITING_CI",
+        "to": "ANALYZING"
+      }
+    },
+    {
+      "id": 210,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:04Z",
+      "type": "agent_started",
+      "level": "info",
+      "message": "Analysis agent started (run #13)",
+      "data": {
+        "run_id": 13,
+        "kind": "analysis"
+      }
+    },
+    {
+      "id": 211,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:16Z",
+      "type": "local_validation",
+      "level": "warning",
+      "message": "Local validation of 83d7e6e: 1 finding(s)",
+      "data": {
+        "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+        "validator": ".claude/skills/k8s-failure-analysis/scripts/validate.py",
+        "targets": [
+          "demo/charts"
+        ],
+        "valid": false,
+        "findings": [
+          {
+            "category": "LOGICAL_CONFIGURATION_ERROR",
+            "check": "service-target-port",
+            "file": "demo/charts/payments-api/templates/service.yaml",
+            "line": null,
+            "message": "Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dropped"
+          }
+        ]
+      }
+    },
+    {
+      "id": 212,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:37Z",
+      "type": "agent_finished",
+      "level": "success",
+      "message": "Analysis agent succeeded · 14 turns · $0.312",
+      "data": {
+        "run_id": 13,
+        "status": "succeeded",
+        "model": "claude-sonnet-5-5",
+        "turns": 14,
+        "cost_usd": 0.3122892,
+        "session_id": "09d5e2a0-94c1-401f-a3a8-8f772f82795c",
+        "error": null,
+        "permission_denials": null
+      }
+    },
+    {
+      "id": 213,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:37Z",
+      "type": "comment_added",
+      "level": "info",
+      "message": "analysis-skill posted a diagnosis",
+      "data": {
+        "comment_id": 13
+      }
+    },
+    {
+      "id": 214,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:37Z",
+      "type": "state_changed",
+      "level": "info",
+      "message": "ANALYZING → TODO: diagnosed LOGICAL_CONFIGURATION_ERROR (93%) — fix planned",
+      "data": {
+        "from": "ANALYZING",
+        "to": "TODO",
+        "classification": "LOGICAL_CONFIGURATION_ERROR"
+      }
+    },
+    {
+      "id": 215,
+      "task_id": 14,
+      "ts": "2026-10-29T06:45:38Z",
+      "type": "awaiting_approval",
+      "level": "warning",
+      "message": "Auto Remediate is off — waiting for “Start Remediation”",
+      "data": null
+    },
+    {
+      "id": 216,
+      "task_id": 14,
+      "ts": "2026-10-29T06:46:13Z",
+      "type": "state_changed",
+      "level": "info",
+      "message": "TODO → IN_PROGRESS: “Start Remediation” by dashboard — attempt 1/2",
+      "data": {
+        "from": "TODO",
+        "to": "IN_PROGRESS"
+      }
+    },
+    {
+      "id": 217,
+      "task_id": 14,
+      "ts": "2026-10-29T06:46:53Z",
+      "type": "agent_started",
+      "level": "info",
+      "message": "Remediation agent started (run #14)",
+      "data": {
+        "run_id": 14,
+        "kind": "remediation"
+      }
+    },
+    {
+      "id": 218,
+      "task_id": 14,
+      "ts": "2026-10-29T06:47:01Z",
+      "type": "agent_finished",
+      "level": "success",
+      "message": "Remediation agent succeeded · 5 turns · $0.033",
+      "data": {
+        "run_id": 14,
+        "status": "succeeded",
+        "model": "claude-sonnet-5-5",
+        "turns": 5,
+        "cost_usd": 0.0327131,
+        "session_id": "ce68be90-ccea-40f5-91f2-eec33e49f1f7",
+        "error": null,
+        "permission_denials": null
+      }
+    },
+    {
+      "id": 219,
+      "task_id": 14,
+      "ts": "2026-10-29T06:47:01Z",
+      "type": "comment_added",
+      "level": "info",
+      "message": "remediation-agent posted a remediation",
+      "data": {
+        "comment_id": 14
+      }
+    },
+    {
+      "id": 220,
+      "task_id": 14,
+      "ts": "2026-10-29T06:47:01Z",
+      "type": "fix_committed",
+      "level": "success",
+      "message": "Fix committed locally as 6c28a12 (1 file(s), 2 lines)",
+      "data": {
+        "commit_sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a"
+      }
+    },
+    {
+      "id": 221,
+      "task_id": 14,
+      "ts": "2026-10-29T06:47:01Z",
+      "type": "awaiting_approval",
+      "level": "warning",
+      "message": "Auto Push is off — waiting for “Approve Push”",
+      "data": null
+    },
+    {
+      "id": 222,
+      "task_id": 14,
+      "ts": "2026-10-29T06:48:11Z",
+      "type": "push_approved",
+      "level": "success",
+      "message": "Push of 6c28a12 approved by dashboard",
+      "data": null
+    },
+    {
+      "id": 223,
+      "task_id": 14,
+      "ts": "2026-10-29T06:48:16Z",
+      "type": "pushed",
+      "level": "success",
+      "message": "Pushed 6c28a12 to demo/logical-error-20261029-084423",
+      "data": {
+        "commit_sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+        "branch": "demo/logical-error-20261029-084423"
+      }
+    },
+    {
+      "id": 224,
+      "task_id": 14,
+      "ts": "2026-10-29T06:48:16Z",
+      "type": "state_changed",
+      "level": "info",
+      "message": "IN_PROGRESS → VALIDATING: waiting for GitHub Actions on 6c28a12",
+      "data": {
+        "from": "IN_PROGRESS",
+        "to": "VALIDATING"
+      }
+    },
+    {
+      "id": 225,
+      "task_id": 14,
+      "ts": "2026-10-29T06:48:33Z",
+      "type": "ci_status",
+      "level": "success",
+      "message": "CI on 6c28a12: success (helm-validate=success)",
+      "data": {
+        "sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+        "overall": "success",
+        "checks": [
+          {
+            "name": "helm-validate",
+            "verdict": "success",
+            "conclusion": "success",
+            "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831437612/job/123306326216"
+          }
+        ]
+      }
+    },
+    {
+      "id": 226,
+      "task_id": 14,
+      "ts": "2026-10-29T06:48:33Z",
+      "type": "state_changed",
+      "level": "success",
+      "message": "VALIDATING → DONE: required checks passed on remediation commit 6c28a12",
+      "data": {
+        "from": "VALIDATING",
+        "to": "DONE"
+      }
+    },
+    {
+      "id": 227,
+      "task_id": 14,
+      "ts": "2026-10-29T06:48:34Z",
+      "type": "notification",
+      "level": "success",
+      "message": "Slack remediated notification sent",
+      "data": null
+    }
+  ],
+  "comments": [
+    {
+      "id": 13,
+      "ts": "2026-10-29T06:45:37Z",
+      "author": "analysis-skill",
+      "kind": "diagnosis",
+      "body_md": "### Diagnosis — `LOGICAL_CONFIGURATION_ERROR`\n\n**Root cause:** In demo/charts/payments-api/values.yaml, the PR changed `service.targetPort` from 8080 to 9090, but the Deployment only exposes container port 8080 (`app.port`, named `http`). The Service therefore routes to a port nothing listens on and would drop traffic.\n\n**Confidence:** 93% · **Auto-remediation:** yes\n**Deterministic evidence:** `LOGICAL_CONFIGURATION_ERROR` — the model agrees.\n\n_Decision: deterministic evidence and analysis support an automatic fix_\n\n#### Validator findings (from CI)\n\n| Category | Check | Location | Message |\n|---|---|---|---|\n| LOGICAL_CONFIGURATION_ERROR | service-target-port | `demo/charts/payments-api/templates/service.yaml` | Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dr |\n\n#### Proposed fix\n\nRestore `service.targetPort` to 8080 so the Service routes to the container port the app listens on.\n\n1. In demo/charts/payments-api/values.yaml, set `service.targetPort` from 9090 back to 8080.\n2. Re-run `validate.py demo/charts` and confirm the `consistency` stage passes.\n3. If exposing a metrics port is still wanted, do it as a separate change: add a metrics `containerPort` in deployment.yaml and a second named Service port. The application must actually serve metrics there.\n\n#### Analysis\n\n## Diagnosis: `helm-validate` failed on `consistency` (`service-target-port`)\n\n**What broke:** The Service now forwards to a port the pod does not listen on.\n\n| Key | Value in PR | Expected |\n|---|---|---|\n| `service.targetPort` (`demo/charts/payments-api/values.yaml:20`) | `9090` | `8080` |\n| `app.port` / `containerPort` (named `http`) | `8080` | unchanged |\n\n**Why:** The PR changed `targetPort: 8080` to `9090`. The Deployment exposes only container port 8080 (`app.port`), so the validator reports \"targetPort 9090 does not match any container port … traffic would be dropped\". The YAML, lint, template and kubeconform stages all passed, so the YAML and schema are valid and only the semantics are wrong.\n\n**Fix:** Set `service.targetPort` back to `8080`. This is a one-line change in `values.yaml`, and no template changes are needed.\n\n**Note:** The PR title says it exposes a metrics port, but the diff does not do that. If a metrics port is wanted, add a separate `containerPort` and a second named Service port. Do not repurpose the `http` port.",
+      "data": {
+        "analysis": {
+          "classification": "LOGICAL_CONFIGURATION_ERROR",
+          "root_cause": "In demo/charts/payments-api/values.yaml, the PR changed `service.targetPort` from 8080 to 9090, but the Deployment only exposes container port 8080 (`app.port`, named `http`). The Service therefore routes to a port nothing listens on and would drop traffic.",
+          "affected_files": [
+            {
+              "path": "demo/charts/payments-api/values.yaml",
+              "line": 20,
+              "reason": "`service.targetPort: 9090` does not match `app.port: 8080`, the port the app binds to. The inline comment says it must route to the container port."
+            },
+            {
+              "path": "demo/charts/payments-api/templates/service.yaml",
+              "line": 14,
+              "reason": "Renders `targetPort` from `.Values.service.targetPort`, so it picks up the wrong value. The template itself is correct and needs no change."
+            }
+          ],
+          "evidence": [
+            {
+              "source": "validator",
+              "detail": "service-target-port (LOGICAL_CONFIGURATION_ERROR): Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dropped"
+            },
+            {
+              "source": "ci_log",
+              "detail": "yaml-parse, helm-lint, helm-template and kubeconform all passed; only `consistency` failed, and the job exited with code 1. The failure is semantic, not syntax or schema."
+            },
+            {
+              "source": "diff",
+              "detail": "values.yaml: `-  targetPort: 8080` / `+  targetPort: 9090`. This is the only change in the PR."
+            },
+            {
+              "source": "file",
+              "detail": "values.yaml sets `app.port: 8080`. deployment.yaml uses it for `containerPort` (named `http`), the `PORT` env var and the probes. The header comment says every port must agree with `app.port`."
+            },
+            {
+              "source": "pr_metadata",
+              "detail": "The PR title is 'Expose payments-api metrics port on the Service', but the diff only retargets the existing `http` port. It adds no metrics port to the Service and no container port to the Deployment, so the change does not do what the title says."
+            },
+            {
+              "source": "validator",
+              "detail": "local-validation.json reproduces the same single finding on the PR head, consistent with the CI result."
+            }
+          ],
+          "proposed_fix": {
+            "summary": "Restore `service.targetPort` to 8080 so the Service routes to the container port the app listens on.",
+            "steps": [
+              "In demo/charts/payments-api/values.yaml, set `service.targetPort` from 9090 back to 8080.",
+              "Re-run `validate.py demo/charts` and confirm the `consistency` stage passes.",
+              "If exposing a metrics port is still wanted, do it as a separate change: add a metrics `containerPort` in deployment.yaml and a second named Service port. The application must actually serve metrics there."
+            ],
+            "changes": [
+              {
+                "file": "demo/charts/payments-api/values.yaml",
+                "description": "set `service.targetPort` from 9090 to 8080 (line 20)"
+              }
+            ]
+          },
+          "confidence": 0.93,
+          "auto_remediation_appropriate": true,
+          "auto_remediation_rationale": "This is a one-line revert to the previous value in demo/charts/**, which is within the remediation scope. The validator finding, the diff and the chart's own comments agree that 8080 is correct. The one caveat is that the PR title implies a metrics-port goal. Reverting does not deliver that, so a human should follow up if it is still wanted.",
+          "markdown": "## Diagnosis: `helm-validate` failed on `consistency` (`service-target-port`)\n\n**What broke:** The Service now forwards to a port the pod does not listen on.\n\n| Key | Value in PR | Expected |\n|---|---|---|\n| `service.targetPort` (`demo/charts/payments-api/values.yaml:20`) | `9090` | `8080` |\n| `app.port` / `containerPort` (named `http`) | `8080` | unchanged |\n\n**Why:** The PR changed `targetPort: 8080` to `9090`. The Deployment exposes only container port 8080 (`app.port`), so the validator reports \"targetPort 9090 does not match any container port … traffic would be dropped\". The YAML, lint, template and kubeconform stages all passed, so the YAML and schema are valid and only the semantics are wrong.\n\n**Fix:** Set `service.targetPort` back to `8080`. This is a one-line change in `values.yaml`, and no template changes are needed.\n\n**Note:** The PR title says it exposes a metrics port, but the diff does not do that. If a metrics port is wanted, add a separate `containerPort` and a second named Service port. Do not repurpose the `http` port."
+        },
+        "reconciled": {
+          "classification": "LOGICAL_CONFIGURATION_ERROR",
+          "llm_classification": "LOGICAL_CONFIGURATION_ERROR",
+          "deterministic_classification": "LOGICAL_CONFIGURATION_ERROR",
+          "agreement": true,
+          "remediable": true,
+          "decision_reason": "deterministic evidence and analysis support an automatic fix",
+          "out_of_scope_files": []
+        },
+        "findings": [
+          {
+            "category": "LOGICAL_CONFIGURATION_ERROR",
+            "chart": "demo/charts/payments-api",
+            "check": "service-target-port",
+            "file": "demo/charts/payments-api/templates/service.yaml",
+            "line": null,
+            "message": "Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dropped",
+            "resource": "Service/rcp-validate-payments-api"
+          }
+        ],
+        "findings_source": "ci",
+        "bundle_dir": "<control-plane>/var/runs/task-14/analysis-13",
+        "route": "helm-validate",
+        "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+        "run_id": 13
+      }
+    },
+    {
+      "id": 14,
+      "ts": "2026-10-29T06:47:01Z",
+      "author": "remediation-agent",
+      "kind": "remediation",
+      "body_md": "### Remediation attempt 1 — ready\n\nRestored service.targetPort from 9090 to 8080 in the payments-api chart values so the Service routes to the container port.\n\n**Rationale:** The Deployment exposes only container port 8080 (app.port, named http), and the values comment says targetPort must match the application's port. 9090 had nothing listening, so traffic would be dropped. The service template is correct and was left unchanged.\n\n- `demo/charts/payments-api/values.yaml` — service.targetPort 9090 → 8080\n\n**Agent-reported validation:** validate.py reported VALID: yaml-parse, helm-lint, helm-template, kubeconform and consistency all passed.\n\n**Scope check:** passed (2 changed lines)\n**Local validation (control plane):** passed\n**Commit:** `6c28a12657bd` (not pushed yet)\n\n```diff\ndiff --git a/demo/charts/payments-api/values.yaml b/demo/charts/payments-api/values.yaml\nindex c115ed6..4dc3ba6 100644\n--- a/demo/charts/payments-api/values.yaml\n+++ b/demo/charts/payments-api/values.yaml\n@@ -17,7 +17,7 @@ service:\n   type: ClusterIP\n   port: 80\n   # Must route to the container port the application listens on.\n-  targetPort: 9090\n+  targetPort: 8080\n \n resources:\n   requests:\n```",
+      "data": {
+        "run_id": 14,
+        "commit_sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+        "problems": []
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": 13,
+      "kind": "analysis",
+      "attempt": 0,
+      "status": "succeeded",
+      "model": "claude-sonnet-5-5",
+      "session_id": "09d5e2a0-94c1-401f-a3a8-8f772f82795c",
+      "exit_code": 0,
+      "cost_usd": 0.3122892,
+      "num_turns": 14,
+      "error": null,
+      "started_at": "2026-10-29T06:45:04Z",
+      "finished_at": "2026-10-29T06:45:37Z",
+      "output": {
+        "classification": "LOGICAL_CONFIGURATION_ERROR",
+        "root_cause": "In demo/charts/payments-api/values.yaml, the PR changed `service.targetPort` from 8080 to 9090, but the Deployment only exposes container port 8080 (`app.port`, named `http`). The Service therefore routes to a port nothing listens on and would drop traffic.",
+        "affected_files": [
+          {
+            "path": "demo/charts/payments-api/values.yaml",
+            "line": 20,
+            "reason": "`service.targetPort: 9090` does not match `app.port: 8080`, the port the app binds to. The inline comment says it must route to the container port."
+          },
+          {
+            "path": "demo/charts/payments-api/templates/service.yaml",
+            "line": 14,
+            "reason": "Renders `targetPort` from `.Values.service.targetPort`, so it picks up the wrong value. The template itself is correct and needs no change."
+          }
+        ],
+        "evidence": [
+          {
+            "source": "validator",
+            "detail": "service-target-port (LOGICAL_CONFIGURATION_ERROR): Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dropped"
+          },
+          {
+            "source": "ci_log",
+            "detail": "yaml-parse, helm-lint, helm-template and kubeconform all passed; only `consistency` failed, and the job exited with code 1. The failure is semantic, not syntax or schema."
+          },
+          {
+            "source": "diff",
+            "detail": "values.yaml: `-  targetPort: 8080` / `+  targetPort: 9090`. This is the only change in the PR."
+          },
+          {
+            "source": "file",
+            "detail": "values.yaml sets `app.port: 8080`. deployment.yaml uses it for `containerPort` (named `http`), the `PORT` env var and the probes. The header comment says every port must agree with `app.port`."
+          },
+          {
+            "source": "pr_metadata",
+            "detail": "The PR title is 'Expose payments-api metrics port on the Service', but the diff only retargets the existing `http` port. It adds no metrics port to the Service and no container port to the Deployment, so the change does not do what the title says."
+          },
+          {
+            "source": "validator",
+            "detail": "local-validation.json reproduces the same single finding on the PR head, consistent with the CI result."
+          }
+        ],
+        "proposed_fix": {
+          "summary": "Restore `service.targetPort` to 8080 so the Service routes to the container port the app listens on.",
+          "steps": [
+            "In demo/charts/payments-api/values.yaml, set `service.targetPort` from 9090 back to 8080.",
+            "Re-run `validate.py demo/charts` and confirm the `consistency` stage passes.",
+            "If exposing a metrics port is still wanted, do it as a separate change: add a metrics `containerPort` in deployment.yaml and a second named Service port. The application must actually serve metrics there."
+          ],
+          "changes": [
+            {
+              "file": "demo/charts/payments-api/values.yaml",
+              "description": "set `service.targetPort` from 9090 to 8080 (line 20)"
+            }
+          ]
+        },
+        "confidence": 0.93,
+        "auto_remediation_appropriate": true,
+        "auto_remediation_rationale": "This is a one-line revert to the previous value in demo/charts/**, which is within the remediation scope. The validator finding, the diff and the chart's own comments agree that 8080 is correct. The one caveat is that the PR title implies a metrics-port goal. Reverting does not deliver that, so a human should follow up if it is still wanted.",
+        "markdown": "## Diagnosis: `helm-validate` failed on `consistency` (`service-target-port`)\n\n**What broke:** The Service now forwards to a port the pod does not listen on.\n\n| Key | Value in PR | Expected |\n|---|---|---|\n| `service.targetPort` (`demo/charts/payments-api/values.yaml:20`) | `9090` | `8080` |\n| `app.port` / `containerPort` (named `http`) | `8080` | unchanged |\n\n**Why:** The PR changed `targetPort: 8080` to `9090`. The Deployment exposes only container port 8080 (`app.port`), so the validator reports \"targetPort 9090 does not match any container port … traffic would be dropped\". The YAML, lint, template and kubeconform stages all passed, so the YAML and schema are valid and only the semantics are wrong.\n\n**Fix:** Set `service.targetPort` back to `8080`. This is a one-line change in `values.yaml`, and no template changes are needed.\n\n**Note:** The PR title says it exposes a metrics port, but the diff does not do that. If a metrics port is wanted, add a separate `containerPort` and a second named Service port. Do not repurpose the `http` port."
+      }
+    },
+    {
+      "id": 14,
+      "kind": "remediation",
+      "attempt": 1,
+      "status": "succeeded",
+      "model": "claude-sonnet-5-5",
+      "session_id": "ce68be90-ccea-40f5-91f2-eec33e49f1f7",
+      "exit_code": 0,
+      "cost_usd": 0.0327131,
+      "num_turns": 5,
+      "error": null,
+      "started_at": "2026-10-29T06:46:53Z",
+      "finished_at": "2026-10-29T06:47:01Z",
+      "output": {
+        "status": "fixed",
+        "summary": "Restored service.targetPort from 9090 to 8080 in the payments-api chart values so the Service routes to the container port.",
+        "changes": [
+          {
+            "file": "demo/charts/payments-api/values.yaml",
+            "description": "service.targetPort 9090 → 8080"
+          }
+        ],
+        "rationale": "The Deployment exposes only container port 8080 (app.port, named http), and the values comment says targetPort must match the application's port. 9090 had nothing listening, so traffic would be dropped. The service template is correct and was left unchanged.",
+        "validation": {
+          "ran": true,
+          "passed": true,
+          "summary": "validate.py reported VALID: yaml-parse, helm-lint, helm-template, kubeconform and consistency all passed."
+        }
+      }
+    }
+  ],
+  "remediations": [
+    {
+      "id": 7,
+      "attempt": 1,
+      "run_id": 14,
+      "base_sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+      "summary": "Restored service.targetPort from 9090 to 8080 in the payments-api chart values so the Service routes to the container port.",
+      "diff": "diff --git a/demo/charts/payments-api/values.yaml b/demo/charts/payments-api/values.yaml\nindex c115ed6..4dc3ba6 100644\n--- a/demo/charts/payments-api/values.yaml\n+++ b/demo/charts/payments-api/values.yaml\n@@ -17,7 +17,7 @@ service:\n   type: ClusterIP\n   port: 80\n   # Must route to the container port the application listens on.\n-  targetPort: 9090\n+  targetPort: 8080\n \n resources:\n   requests:",
+      "files": [
+        {
+          "path": "demo/charts/payments-api/values.yaml",
+          "status": "M",
+          "added": 1,
+          "removed": 1
+        }
+      ],
+      "scope_ok": true,
+      "scope_violations": [],
+      "validation_passed": true,
+      "validation": {
+        "valid": true,
+        "charts": [
+          {
+            "chart": "demo/charts/payments-api",
+            "stages": [
+              {
+                "name": "yaml-parse",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "helm-lint",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "helm-template",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "kubeconform",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "consistency",
+                "status": "passed",
+                "detail": ""
+              }
+            ],
+            "findings": []
+          }
+        ],
+        "exit_code": 0,
+        "tool_error": false
+      },
+      "commit_sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+      "push_status": "pushed",
+      "push_error": null,
+      "pushed_at": "2026-10-29T06:48:16Z",
+      "created_at": "2026-10-29T06:47:01Z"
+    }
+  ],
+  "validations": [
+    {
+      "id": 13,
+      "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+      "purpose": "pre-analysis",
+      "valid": false,
+      "exit_code": 1,
+      "report": {
+        "valid": false,
+        "charts": [
+          {
+            "chart": "demo/charts/payments-api",
+            "stages": [
+              {
+                "name": "yaml-parse",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "helm-lint",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "helm-template",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "kubeconform",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "consistency",
+                "status": "failed",
+                "detail": ""
+              }
+            ],
+            "findings": [
+              {
+                "category": "LOGICAL_CONFIGURATION_ERROR",
+                "check": "service-target-port",
+                "message": "Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dropped",
+                "chart": "demo/charts/payments-api",
+                "file": "demo/charts/payments-api/templates/service.yaml",
+                "line": null,
+                "resource": "Service/rcp-validate-payments-api"
+              }
+            ]
+          }
+        ],
+        "exit_code": 1,
+        "tool_error": false
+      },
+      "ts": "2026-10-29T06:45:16Z"
+    },
+    {
+      "id": 14,
+      "sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+      "purpose": "post-remediation",
+      "valid": true,
+      "exit_code": 0,
+      "report": {
+        "valid": true,
+        "charts": [
+          {
+            "chart": "demo/charts/payments-api",
+            "stages": [
+              {
+                "name": "yaml-parse",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "helm-lint",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "helm-template",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "kubeconform",
+                "status": "passed",
+                "detail": ""
+              },
+              {
+                "name": "consistency",
+                "status": "passed",
+                "detail": ""
+              }
+            ],
+            "findings": []
+          }
+        ],
+        "exit_code": 0,
+        "tool_error": false
+      },
+      "ts": "2026-10-29T06:47:01Z"
+    }
+  ],
+  "ci": [
+    {
+      "id": 44,
+      "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+      "overall": "pending",
+      "checks": [
+        {
+          "id": 123305128535,
+          "name": "helm-validate",
+          "status": "queued",
+          "conclusion": null,
+          "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+          "details_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+          "started_at": "2026-10-29T06:44:40Z",
+          "completed_at": null,
+          "app_slug": "github-actions",
+          "verdict": "pending"
+        }
+      ],
+      "ts": "2026-10-29T06:44:43Z"
+    },
+    {
+      "id": 45,
+      "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+      "overall": "failure",
+      "checks": [
+        {
+          "id": 123305128535,
+          "name": "helm-validate",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+          "details_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+          "started_at": "2026-10-29T06:44:42Z",
+          "completed_at": "2026-10-29T06:44:54Z",
+          "app_slug": "github-actions",
+          "verdict": "failure"
+        }
+      ],
+      "ts": "2026-10-29T06:45:00Z"
+    },
+    {
+      "id": 46,
+      "sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+      "overall": "success",
+      "checks": [
+        {
+          "id": 123306326216,
+          "name": "helm-validate",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831437612/job/123306326216",
+          "details_url": "https://github.com/brinops/ai-workshop/actions/runs/40831437612/job/123306326216",
+          "started_at": "2026-10-29T06:48:23Z",
+          "completed_at": "2026-10-29T06:48:32Z",
+          "app_slug": "github-actions",
+          "verdict": "success"
+        }
+      ],
+      "ts": "2026-10-29T06:48:33Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": 7,
+      "channel": "slack",
+      "kind": "remediated",
+      "status": "sent",
+      "error": null,
+      "preview": "AI remediation succeeded — CI is green: brinops/ai-workshop#16",
+      "ts": "2026-10-29T06:48:33Z"
+    }
+  ]
+}

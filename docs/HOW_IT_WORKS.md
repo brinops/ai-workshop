@@ -5,6 +5,9 @@ what happens next. The worker calls them for exactly two jobs — *diagnose* and
 and the worker decides the next step. Everything that happens is written to SQLite (`var/rcp.db`), and the
 worker decides what to do next purely by reading those rows.
 
+Every file mentioned below — evidence bundle, agent JSON, transcripts, diff, Slack payload — from one real run
+is in [examples/](examples/README.md).
+
 ## Who does what
 
 | Component | What it is | Role |

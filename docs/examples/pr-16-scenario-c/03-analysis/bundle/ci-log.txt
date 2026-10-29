@@ -1,0 +1,81 @@
+===== helm-validate (failure) =====
+[command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/63a4f961-765b-4195-88e8-7f130da5423a -f /home/runner/work/_temp/0e2a7523-bea6-46c9-bfd2-dc9da5e41028
+##[endgroup]
+Helm tool version 'v3.16.2' has been cached at /opt/hostedtoolcache/helm/3.16.2/x64/linux-amd64/helm
+##[group]Run curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+[36;1mcurl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \[0m
+[36;1m  | tar -xz -C /usr/local/bin kubeconform[0m
+[36;1mkubeconform -v[0m
+shell: /usr/bin/bash -e {0}
+env:
+  KUBECONFORM_VERSION: v0.6.7
+##[endgroup]
+v0.6.7
+##[group]Run actions/setup-python@v5
+with:
+  python-version: 3.12
+  check-latest: false
+  token: ***
+  update-environment: true
+  allow-prereleases: false
+  freethreaded: false
+env:
+  KUBECONFORM_VERSION: v0.6.7
+##[endgroup]
+##[group]Installed versions
+(node:2071) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Successfully set up CPython (3.12.15)
+(Use `node --trace-deprecation ...` to show where the warning was created)
+##[endgroup]
+##[group]Run pip install --quiet "pyyaml>=6"
+[36;1mpip install --quiet "pyyaml>=6"[0m
+shell: /usr/bin/bash -e {0}
+env:
+  KUBECONFORM_VERSION: v0.6.7
+  pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+  PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+  Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+  Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+  Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+  LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+##[endgroup]
+##[group]Run python .claude/skills/k8s-failure-analysis/scripts/validate.py demo/charts --format github
+[36;1mpython .claude/skills/k8s-failure-analysis/scripts/validate.py demo/charts --format github[0m
+shell: /usr/bin/bash -e {0}
+env:
+  KUBECONFORM_VERSION: v0.6.7
+  pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+  PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+  Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+  Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+  Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+  LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+  KUBECONFORM_CACHE: /home/runner/work/_temp/kubeconform-cache
+##[endgroup]
+##[group]demo/charts/payments-api
+  yaml-parse     passed
+  helm-lint      passed
+  helm-template  passed
+  kubeconform    passed
+  consistency    failed
+##[endgroup]
+##[error]Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dropped
+RCP-FINDING {"category": "LOGICAL_CONFIGURATION_ERROR", "chart": "demo/charts/payments-api", "check": "service-target-port", "file": "demo/charts/payments-api/templates/service.yaml", "line": null, "message": "Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) \u2014 traffic would be dropped", "resource": "Service/rcp-validate-payments-api"}
+1 chart(s) validated, 1 finding(s)
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/8c4b7b4a-0b03-41d9-9e90-3c4e04170400' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/ai-workshop/ai-workshop
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+[command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+http.https://github.com/.extraheader
+[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Cleaning up orphan processes
+##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5, azure/setup-helm@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

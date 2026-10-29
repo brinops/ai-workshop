@@ -1,0 +1,152 @@
+[
+  {
+    "ts": "2026-10-29T06:44:38Z",
+    "type": "registered",
+    "level": "success",
+    "message": "PR #16 registered via hook (demo/logical-error-20261029-084423 @ 83d7e6e)"
+  },
+  {
+    "ts": "2026-10-29T06:44:38Z",
+    "type": "state_changed",
+    "level": "info",
+    "message": "NEW → WAITING_CI: waiting for GitHub Actions"
+  },
+  {
+    "ts": "2026-10-29T06:44:43Z",
+    "type": "ci_status",
+    "level": "info",
+    "message": "CI on 83d7e6e: pending (helm-validate=pending)"
+  },
+  {
+    "ts": "2026-10-29T06:45:00Z",
+    "type": "ci_status",
+    "level": "error",
+    "message": "CI on 83d7e6e: failure (helm-validate=failure)"
+  },
+  {
+    "ts": "2026-10-29T06:45:00Z",
+    "type": "route_selected",
+    "level": "info",
+    "message": "Route helm-validate → skill k8s-failure-analysis, agent k8s-remediator"
+  },
+  {
+    "ts": "2026-10-29T06:45:00Z",
+    "type": "awaiting_approval",
+    "level": "warning",
+    "message": "CI failed. Auto Analyze is off — waiting for “Analyze Now”"
+  },
+  {
+    "ts": "2026-10-29T06:45:04Z",
+    "type": "state_changed",
+    "level": "info",
+    "message": "WAITING_CI → ANALYZING: “Analyze Now” by dashboard"
+  },
+  {
+    "ts": "2026-10-29T06:45:04Z",
+    "type": "agent_started",
+    "level": "info",
+    "message": "Analysis agent started (run #13)"
+  },
+  {
+    "ts": "2026-10-29T06:45:16Z",
+    "type": "local_validation",
+    "level": "warning",
+    "message": "Local validation of 83d7e6e: 1 finding(s)"
+  },
+  {
+    "ts": "2026-10-29T06:45:37Z",
+    "type": "agent_finished",
+    "level": "success",
+    "message": "Analysis agent succeeded · 14 turns · $0.312"
+  },
+  {
+    "ts": "2026-10-29T06:45:37Z",
+    "type": "comment_added",
+    "level": "info",
+    "message": "analysis-skill posted a diagnosis"
+  },
+  {
+    "ts": "2026-10-29T06:45:37Z",
+    "type": "state_changed",
+    "level": "info",
+    "message": "ANALYZING → TODO: diagnosed LOGICAL_CONFIGURATION_ERROR (93%) — fix planned"
+  },
+  {
+    "ts": "2026-10-29T06:45:38Z",
+    "type": "awaiting_approval",
+    "level": "warning",
+    "message": "Auto Remediate is off — waiting for “Start Remediation”"
+  },
+  {
+    "ts": "2026-10-29T06:46:13Z",
+    "type": "state_changed",
+    "level": "info",
+    "message": "TODO → IN_PROGRESS: “Start Remediation” by dashboard — attempt 1/2"
+  },
+  {
+    "ts": "2026-10-29T06:46:53Z",
+    "type": "agent_started",
+    "level": "info",
+    "message": "Remediation agent started (run #14)"
+  },
+  {
+    "ts": "2026-10-29T06:47:01Z",
+    "type": "agent_finished",
+    "level": "success",
+    "message": "Remediation agent succeeded · 5 turns · $0.033"
+  },
+  {
+    "ts": "2026-10-29T06:47:01Z",
+    "type": "comment_added",
+    "level": "info",
+    "message": "remediation-agent posted a remediation"
+  },
+  {
+    "ts": "2026-10-29T06:47:01Z",
+    "type": "fix_committed",
+    "level": "success",
+    "message": "Fix committed locally as 6c28a12 (1 file(s), 2 lines)"
+  },
+  {
+    "ts": "2026-10-29T06:47:01Z",
+    "type": "awaiting_approval",
+    "level": "warning",
+    "message": "Auto Push is off — waiting for “Approve Push”"
+  },
+  {
+    "ts": "2026-10-29T06:48:11Z",
+    "type": "push_approved",
+    "level": "success",
+    "message": "Push of 6c28a12 approved by dashboard"
+  },
+  {
+    "ts": "2026-10-29T06:48:16Z",
+    "type": "pushed",
+    "level": "success",
+    "message": "Pushed 6c28a12 to demo/logical-error-20261029-084423"
+  },
+  {
+    "ts": "2026-10-29T06:48:16Z",
+    "type": "state_changed",
+    "level": "info",
+    "message": "IN_PROGRESS → VALIDATING: waiting for GitHub Actions on 6c28a12"
+  },
+  {
+    "ts": "2026-10-29T06:48:33Z",
+    "type": "ci_status",
+    "level": "success",
+    "message": "CI on 6c28a12: success (helm-validate=success)"
+  },
+  {
+    "ts": "2026-10-29T06:48:33Z",
+    "type": "state_changed",
+    "level": "success",
+    "message": "VALIDATING → DONE: required checks passed on remediation commit 6c28a12"
+  },
+  {
+    "ts": "2026-10-29T06:48:34Z",
+    "type": "notification",
+    "level": "success",
+    "message": "Slack remediated notification sent"
+  }
+]

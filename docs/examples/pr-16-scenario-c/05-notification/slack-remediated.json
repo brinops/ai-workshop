@@ -1,0 +1,71 @@
+{
+  "text": "AI remediation succeeded — CI is green: brinops/ai-workshop#16",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":white_check_mark: AI remediation succeeded — CI is green",
+        "emoji": true
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Repository*\nbrinops/ai-workshop"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Pull request*\n<https://github.com/brinops/ai-workshop/pull/16|#16 Expose payments-api metrics port on the Service>"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Classification*\n`LOGICAL_CONFIGURATION_ERROR`"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Validation*\nLocal validator ✅ · GitHub Actions ✅ (helm-validate) on `6c28a12`"
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Original problem*\nLOGICAL_CONFIGURATION_ERROR: Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) — traffic would be dropped"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Root cause*\nIn demo/charts/payments-api/values.yaml, the PR changed `service.targetPort` from 8080 to 9090, but the Deployment only exposes container port 8080 (`app.port`, named `http`). The Service therefore routes to a port nothing listens on and would drop traffic."
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Files changed*\n• `demo/charts/payments-api/values.yaml`"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Diff*\n```@@ -17,7 +17,7 @@ service:\n-  targetPort: 9090\n+  targetPort: 8080```"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "<https://github.com/brinops/ai-workshop/pull/16|Open PR on GitHub> · <https://github.com/brinops/ai-workshop/commit/6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a|Fix commit> · <http://127.0.0.1:8077/tasks/14|Dashboard task>"
+        }
+      ]
+    }
+  ]
+}

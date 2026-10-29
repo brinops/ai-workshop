@@ -1,0 +1,85 @@
+{
+  "pull_request": {
+    "repo": "brinops/ai-workshop",
+    "number": 16,
+    "title": "Expose payments-api metrics port on the Service",
+    "author": "bohdan-rebrov",
+    "head_branch": "demo/logical-error-20261029-084423",
+    "base_branch": "main",
+    "head_sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+    "url": "https://github.com/brinops/ai-workshop/pull/16"
+  },
+  "changed_files": [
+    {
+      "filename": "demo/charts/payments-api/values.yaml",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    }
+  ],
+  "route": {
+    "check": "helm-validate",
+    "analysis_skill": "k8s-failure-analysis",
+    "remediation_agent": "k8s-remediator",
+    "validator": ".claude/skills/k8s-failure-analysis/scripts/validate.py",
+    "allowed_paths": [
+      "demo/charts/**"
+    ],
+    "max_changed_lines": 40,
+    "max_attempts": 2
+  },
+  "failed_checks": [
+    {
+      "name": "helm-validate",
+      "conclusion": "failure",
+      "url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+      "annotations": [
+        {
+          "path": ".github",
+          "start_line": 2,
+          "title": "",
+          "message": "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5, azure/setup-helm@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/",
+          "annotation_level": "warning"
+        },
+        {
+          "path": ".github",
+          "start_line": 24,
+          "title": "",
+          "message": "Process completed with exit code 1.",
+          "annotation_level": "failure"
+        },
+        {
+          "path": "demo/charts/payments-api/templates/service.yaml",
+          "start_line": 0,
+          "title": "LOGICAL_CONFIGURATION_ERROR (service-target-port)",
+          "message": "Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) \u2014 traffic would be dropped",
+          "annotation_level": "failure"
+        },
+        {
+          "path": ".github",
+          "start_line": 1,
+          "title": "",
+          "message": "\"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748\"",
+          "annotation_level": "notice"
+        }
+      ]
+    }
+  ],
+  "deterministic_findings": [
+    {
+      "category": "LOGICAL_CONFIGURATION_ERROR",
+      "chart": "demo/charts/payments-api",
+      "check": "service-target-port",
+      "file": "demo/charts/payments-api/templates/service.yaml",
+      "line": null,
+      "message": "Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) \u2014 traffic would be dropped",
+      "resource": "Service/rcp-validate-payments-api"
+    }
+  ],
+  "deterministic_findings_source": "ci",
+  "previous_attempts": 0,
+  "remediation_scope": [
+    "demo/charts/**"
+  ],
+  "worktree": "<control-plane>/var/worktrees/task-14-analysis-r13"
+}

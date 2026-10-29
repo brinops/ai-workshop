@@ -1,0 +1,45 @@
+{
+  "sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+  "purpose": "post-remediation",
+  "valid": 1,
+  "exit_code": 0,
+  "report": {
+    "valid": true,
+    "charts": [
+      {
+        "chart": "demo/charts/payments-api",
+        "stages": [
+          {
+            "name": "yaml-parse",
+            "status": "passed",
+            "detail": ""
+          },
+          {
+            "name": "helm-lint",
+            "status": "passed",
+            "detail": ""
+          },
+          {
+            "name": "helm-template",
+            "status": "passed",
+            "detail": ""
+          },
+          {
+            "name": "kubeconform",
+            "status": "passed",
+            "detail": ""
+          },
+          {
+            "name": "consistency",
+            "status": "passed",
+            "detail": ""
+          }
+        ],
+        "findings": []
+      }
+    ],
+    "exit_code": 0,
+    "tool_error": false
+  },
+  "ts": "2026-10-29 06:47:01.920921"
+}

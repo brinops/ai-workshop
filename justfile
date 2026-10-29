@@ -60,6 +60,10 @@ scenario id base="main":
 dry-run id="C":
     {{py}} demo/scripts/agent_dry_run.py {{id}}
 
+# Export every artifact of a finished task into a folder: just export-run 14 docs/examples/pr-16-scenario-c
+export-run task out:
+    {{py}} scripts/export_run.py {{task}} {{out}} --api {{api}}
+
 # Verify binaries, credentials, integrations, service health (add --live / --slack)
 preflight *flags:
     python3 scripts/preflight.py {{flags}}

@@ -1,0 +1,7 @@
+{
+  "channel": "slack",
+  "kind": "remediated",
+  "status": "sent",
+  "preview": "AI remediation succeeded — CI is green: brinops/ai-workshop#16",
+  "ts": "2026-10-29 06:48:33.570425"
+}

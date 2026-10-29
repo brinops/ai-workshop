@@ -1,0 +1,19 @@
+{
+  "attempt": 1,
+  "base_sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+  "summary": "Restored service.targetPort from 9090 to 8080 in the payments-api chart values so the Service routes to the container port.",
+  "files": [
+    {
+      "path": "demo/charts/payments-api/values.yaml",
+      "status": "M",
+      "added": 1,
+      "removed": 1
+    }
+  ],
+  "scope_ok": 1,
+  "scope_violations": [],
+  "validation_passed": 1,
+  "commit_sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+  "push_status": "pushed",
+  "pushed_at": "2026-10-29 06:48:16.121148"
+}

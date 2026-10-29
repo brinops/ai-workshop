@@ -1,0 +1,59 @@
+[
+  {
+    "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+    "overall": "pending",
+    "checks": [
+      {
+        "id": 123305128535,
+        "name": "helm-validate",
+        "status": "queued",
+        "conclusion": null,
+        "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+        "details_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+        "started_at": "2026-10-29T06:44:40Z",
+        "completed_at": null,
+        "app_slug": "github-actions",
+        "verdict": "pending"
+      }
+    ],
+    "ts": "2026-10-29 06:44:43.558505"
+  },
+  {
+    "sha": "83d7e6e4615775a9565887b6de17473fcf2760d4",
+    "overall": "failure",
+    "checks": [
+      {
+        "id": 123305128535,
+        "name": "helm-validate",
+        "status": "completed",
+        "conclusion": "failure",
+        "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+        "details_url": "https://github.com/brinops/ai-workshop/actions/runs/40831056881/job/123305128535",
+        "started_at": "2026-10-29T06:44:42Z",
+        "completed_at": "2026-10-29T06:44:54Z",
+        "app_slug": "github-actions",
+        "verdict": "failure"
+      }
+    ],
+    "ts": "2026-10-29 06:45:00.188231"
+  },
+  {
+    "sha": "6c28a12657bdf9cf70b5ba959f4a38e1ee7db02a",
+    "overall": "success",
+    "checks": [
+      {
+        "id": 123306326216,
+        "name": "helm-validate",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/brinops/ai-workshop/actions/runs/40831437612/job/123306326216",
+        "details_url": "https://github.com/brinops/ai-workshop/actions/runs/40831437612/job/123306326216",
+        "started_at": "2026-10-29T06:48:23Z",
+        "completed_at": "2026-10-29T06:48:32Z",
+        "app_slug": "github-actions",
+        "verdict": "success"
+      }
+    ],
+    "ts": "2026-10-29 06:48:33.566612"
+  }
+]
