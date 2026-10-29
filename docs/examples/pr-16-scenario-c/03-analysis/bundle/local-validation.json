@@ -1,0 +1,48 @@
+{
+  "valid": false,
+  "charts": [
+    {
+      "chart": "demo/charts/payments-api",
+      "stages": [
+        {
+          "name": "yaml-parse",
+          "status": "passed",
+          "detail": ""
+        },
+        {
+          "name": "helm-lint",
+          "status": "passed",
+          "detail": ""
+        },
+        {
+          "name": "helm-template",
+          "status": "passed",
+          "detail": ""
+        },
+        {
+          "name": "kubeconform",
+          "status": "passed",
+          "detail": ""
+        },
+        {
+          "name": "consistency",
+          "status": "failed",
+          "detail": ""
+        }
+      ],
+      "findings": [
+        {
+          "category": "LOGICAL_CONFIGURATION_ERROR",
+          "check": "service-target-port",
+          "message": "Service/rcp-validate-payments-api port 'http' targetPort 9090 does not match any container port of Deployment/rcp-validate-payments-api (container ports: [8080], names: ['http']) \u2014 traffic would be dropped",
+          "chart": "demo/charts/payments-api",
+          "file": "demo/charts/payments-api/templates/service.yaml",
+          "line": null,
+          "resource": "Service/rcp-validate-payments-api"
+        }
+      ]
+    }
+  ],
+  "exit_code": 1,
+  "tool_error": false
+}

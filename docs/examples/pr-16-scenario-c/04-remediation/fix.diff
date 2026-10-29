@@ -1,0 +1,13 @@
+diff --git a/demo/charts/payments-api/values.yaml b/demo/charts/payments-api/values.yaml
+index c115ed6..4dc3ba6 100644
+--- a/demo/charts/payments-api/values.yaml
++++ b/demo/charts/payments-api/values.yaml
+@@ -17,7 +17,7 @@ service:
+   type: ClusterIP
+   port: 80
+   # Must route to the container port the application listens on.
+-  targetPort: 9090
++  targetPort: 8080
+ 
+ resources:
+   requests:

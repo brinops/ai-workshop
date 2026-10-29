@@ -1,0 +1,16 @@
+{
+  "status": "fixed",
+  "summary": "Restored service.targetPort from 9090 to 8080 in the payments-api chart values so the Service routes to the container port.",
+  "changes": [
+    {
+      "file": "demo/charts/payments-api/values.yaml",
+      "description": "service.targetPort 9090 → 8080"
+    }
+  ],
+  "rationale": "The Deployment exposes only container port 8080 (app.port, named http), and the values comment says targetPort must match the application's port. 9090 had nothing listening, so traffic would be dropped. The service template is correct and was left unchanged.",
+  "validation": {
+    "ran": true,
+    "passed": true,
+    "summary": "validate.py reported VALID: yaml-parse, helm-lint, helm-template, kubeconform and consistency all passed."
+  }
+}

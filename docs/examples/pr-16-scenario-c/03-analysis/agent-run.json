@@ -1,0 +1,12 @@
+{
+  "id": 13,
+  "kind": "analysis",
+  "attempt": 0,
+  "status": "succeeded",
+  "model": "claude-sonnet-5-5",
+  "num_turns": 14,
+  "cost_usd": 0.3122892,
+  "exit_code": 0,
+  "started_at": "2026-10-29 06:45:04.216204",
+  "finished_at": "2026-10-29 06:45:37.348010"
+}

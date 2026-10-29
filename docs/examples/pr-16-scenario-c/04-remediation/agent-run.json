@@ -1,0 +1,12 @@
+{
+  "id": 14,
+  "kind": "remediation",
+  "attempt": 1,
+  "status": "succeeded",
+  "model": "claude-sonnet-5-5",
+  "num_turns": 5,
+  "cost_usd": 0.0327131,
+  "exit_code": 0,
+  "started_at": "2026-10-29 06:46:53.864753",
+  "finished_at": "2026-10-29 06:47:01.757041"
+}
