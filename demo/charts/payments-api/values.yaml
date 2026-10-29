@@ -1,7 +1,7 @@
 # Payments API — the application process listens on `app.port`.
 # Every port in this chart must agree with it: the container port,
 # the Service targetPort and the health probes.
-replicaCount: three
+replicaCount: 3
 
 image:
   repository: ghcr.io/nginxinc/nginx-unprivileged
