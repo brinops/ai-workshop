@@ -31,7 +31,7 @@ from app.integrations.claude_runner import AgentSpec, run_agent  # noqa: E402
 from app.services import validation  # noqa: E402
 
 
-def emit(kind: str, text: str) -> None:
+def emit(kind: str, text: str, detail: str | None = None) -> None:
     print(f"  [{kind:<11}] {text[:220]}")
 
 
