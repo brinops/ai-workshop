@@ -19,7 +19,7 @@ from app.models.jira_workflow import (
     JiraWorkflowState,
 )
 from app.models.training_jira import TrainingIssue
-from app.orchestration.booking_repair import KIND
+from app.orchestration.booking_repair import BookingPlan
 
 router = APIRouter(prefix="/api/jira/workshop/runs", tags=["Workshop runs"])
 Database = Annotated[Session, Depends(get_db)]
@@ -60,6 +60,7 @@ class DraftSummary(BaseModel):
 
 class RepairResult(BaseModel):
     status: str
+    plan: BookingPlan | None = None
     summary: str | None = None
     patch: str | None = None
     test_output: str | None = None
@@ -131,7 +132,7 @@ def get_run(run_id: str, db: Database) -> RunDetail:
 
 
 @router.post("/{run_id}/actions/{action}")
-def change_handoff_state(run_id: str, action: Literal["start", "finish"], db: Database) -> RunSummary:
+def change_handoff_state(run_id: str, action: Literal["start", "finish", "retry-plan"], db: Database) -> RunSummary:
     db.connection().exec_driver_sql("BEGIN IMMEDIATE")
     run = db.get(JiraWorkflowRun, run_id)
     if run is None:
@@ -145,27 +146,27 @@ def change_handoff_state(run_id: str, action: Literal["start", "finish"], db: Da
         if run.state != state.IN_PROGRESS or not repair or repair.status != "passed":
             raise HTTPException(409, "booking tests must pass before finishing")
         run.state = state.DONE
+    elif action == "retry-plan":
+        if run.state != state.READY_FOR_HANDOFF or not repair or repair.status != "failed":
+            raise HTTPException(409, "there is no failed plan to retry")
+        repair.status, repair.result = "pending", None
+        return summarize(run, repair.status)
     else:
         if run.state not in (state.READY_FOR_HANDOFF, state.IN_PROGRESS) or run.source_kind != "training":
             raise HTTPException(409, "run is not ready for the training booking repair")
-        if repair and repair.status != "failed":
-            return summarize(run, repair.status)
-        if repair:
+        if run.state == state.IN_PROGRESS and repair and repair.status == "failed" and not (repair.result or {}).get("plan"):
+            # An old run may have started planning under the previous handoff flow.
+            run.state = state.READY_FOR_HANDOFF
             repair.status, repair.result = "pending", None
             return summarize(run, repair.status)
-        draft = db.scalar(select(JiraWorkflowDraft).join(
-            JiraWorkflowDecision, JiraWorkflowDecision.draft_id == JiraWorkflowDraft.draft_id,
-        ).where(
-            JiraWorkflowDraft.run_id == run_id, JiraWorkflowDraft.status == "approved",
-            JiraWorkflowDecision.decision == "approve",
-        ).order_by(JiraWorkflowDraft.version.desc()).limit(1))
-        if draft is None:
-            raise HTTPException(409, "booking repair requires an approved draft")
-        repair = JiraWorkflowOperation(
-            operation_id=op_id, run_id=run_id, kind=KIND, status="pending",
-            payload={"approved_report": draft.rendered_append},
-        )
-        db.add(repair)
+        if not repair or not (repair.result or {}).get("plan"):
+            raise HTTPException(409, "the implementation plan must be ready before starting")
+        if run.state == state.IN_PROGRESS and repair.status != "failed":
+            return summarize(run, repair.status)
+        if repair.status not in ("planned", "failed"):
+            raise HTTPException(409, "the implementation plan must be ready before starting")
+        repair.status = "pending"
+        repair.result = {"status": "pending", "plan": repair.result["plan"]}
         run.state = state.IN_PROGRESS
 
     event_id = f"{run_id}:handoff:{action}"

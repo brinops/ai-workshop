@@ -10,13 +10,23 @@ from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import indent
+from typing import Annotated
 
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 from sqlalchemy import and_, or_, select
+from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT
 from app.db import session_scope, utcnow
 from app.integrations.claude_runner import AgentSpec
-from app.models.jira_workflow import JiraWorkflowEvent, JiraWorkflowOperation
+from app.models.jira_workflow import (
+    JiraWorkflowDecision,
+    JiraWorkflowDraft,
+    JiraWorkflowEvent,
+    JiraWorkflowOperation,
+    JiraWorkflowRun,
+    JiraWorkflowState,
+)
 from app.services.redaction import redact
 
 KIND = "booking_repair"
@@ -27,6 +37,17 @@ SCHEMA = {
     "required": ["body", "summary"],
     "additionalProperties": False,
 }
+PlanText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class BookingPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    goal: PlanText
+    steps: list[PlanText] = Field(min_length=1, max_length=5)
+    acceptance_criteria: list[PlanText] = Field(min_length=1, max_length=5)
+
+
 ALLOWED_NODES = (
     ast.Module, ast.AsyncFunctionDef, ast.arguments, ast.arg, ast.Expr, ast.Await, ast.Call, ast.Attribute,
     ast.Name, ast.Load, ast.Store, ast.If, ast.Compare, ast.Gt, ast.AugAssign, ast.Sub, ast.Return, ast.Constant,
@@ -77,7 +98,36 @@ async def _verify(workspace: Path) -> tuple[int, str]:
     return process.returncode, output.decode(errors="replace")
 
 
-async def repair_booking(report: str, run_agent, cancel: asyncio.Event, timeout: float) -> dict:
+async def plan_booking(report: str, run_agent, cancel: asyncio.Event, timeout: float) -> BookingPlan:
+    with TemporaryDirectory(prefix="workshop-planning-") as directory:
+        workspace = Path(directory)
+        agents = workspace / ".claude" / "agents"
+        agents.mkdir(parents=True)
+        name = "workshop-planning"
+        shutil.copyfile(REPO_ROOT / ".claude" / "agents" / f"{name}.md", agents / f"{name}.md")
+        spec = AgentSpec(
+            prompt=json.dumps({
+                "approved_report": report,
+                "source": (REPO_ROOT / FIXTURE / "service.py").read_text(encoding="utf-8"),
+                "test": (REPO_ROOT / FIXTURE / "test_booking.py").read_text(encoding="utf-8"),
+            }, ensure_ascii=False),
+            agent=name, tools=["StructuredOutput"], allowed_tools=["StructuredOutput"],
+            json_schema=BookingPlan.model_json_schema(), cwd=workspace, timeout=timeout, output_language="Ukrainian",
+        )
+        result = await run_agent(spec, lambda *_: None, cancel, None)
+    if result.status != "succeeded":
+        raise RuntimeError(result.error or f"Planning agent {result.status}")
+    try:
+        plan = BookingPlan.model_validate(result.structured)
+    except ValidationError as exc:
+        raise RuntimeError("Planning agent returned an invalid plan") from exc
+    return BookingPlan(
+        goal=redact(plan.goal), steps=[redact(step) for step in plan.steps],
+        acceptance_criteria=[redact(criterion) for criterion in plan.acceptance_criteria],
+    )
+
+
+async def repair_booking(report: str, plan: BookingPlan, run_agent, cancel: asyncio.Event, timeout: float) -> dict:
     with TemporaryDirectory(prefix="workshop-booking-") as directory:
         workspace = Path(directory)
         fixture = workspace / FIXTURE
@@ -87,12 +137,12 @@ async def repair_booking(report: str, run_agent, cancel: asyncio.Event, timeout:
         source_path.write_text(source, encoding="utf-8")
         shutil.copyfile(REPO_ROOT / FIXTURE / "test_booking.py", fixture / "test_booking.py")
         spec = AgentSpec(
-            prompt=json.dumps({"task": "Fix the booking race. Return the complete unindented body of "
+            prompt=json.dumps({"task": "Implement the approved booking report using the implementation plan. Return the complete unindented body of "
                                "BookingService.reserve(self, user_id), with no signature or Markdown, "
                                "and a short summary of the code change. The worker reports tests separately. "
                                "Use only the existing eligibility call, seat counter, "
                                "confirmed/waitlist append, and return statuses. Keep the async eligibility check.",
-                               "approved_report": report, "source": source,
+                               "approved_report": report, "plan": plan.model_dump(), "source": source,
                                "test": (fixture / "test_booking.py").read_text(encoding="utf-8")}, ensure_ascii=False),
             tools=["StructuredOutput"], allowed_tools=["StructuredOutput"], json_schema=SCHEMA,
             cwd=workspace, timeout=timeout, output_language="Ukrainian",
@@ -116,7 +166,35 @@ async def repair_booking(report: str, run_agent, cancel: asyncio.Event, timeout:
         }
 
 
-def claim_repair(timeout: float) -> tuple[str, int, str] | None:
+def _next_unplanned_handoff(db: Session) -> JiraWorkflowOperation | None:
+    row = db.execute(
+        select(JiraWorkflowRun, JiraWorkflowDraft)
+        .join(JiraWorkflowDraft, JiraWorkflowDraft.run_id == JiraWorkflowRun.run_id)
+        .join(JiraWorkflowDecision, JiraWorkflowDecision.draft_id == JiraWorkflowDraft.draft_id)
+        .where(
+            JiraWorkflowRun.source_kind == "training",
+            JiraWorkflowRun.state == JiraWorkflowState.READY_FOR_HANDOFF,
+            JiraWorkflowDraft.status == "approved",
+            JiraWorkflowDecision.decision == "approve",
+            ~select(JiraWorkflowOperation.operation_id).where(
+                JiraWorkflowOperation.operation_id == JiraWorkflowRun.run_id + ":booking-repair",
+            ).exists(),
+        )
+        .order_by(JiraWorkflowRun.updated_at, JiraWorkflowRun.run_id, JiraWorkflowDraft.version.desc())
+        .limit(1)
+    ).first()
+    if row is None:
+        return None
+    run, draft = row
+    operation = JiraWorkflowOperation(
+        operation_id=f"{run.run_id}:booking-repair", run_id=run.run_id, kind=KIND,
+        payload={"approved_report": draft.rendered_append}, attempts=0,
+    )
+    db.add(operation)
+    return operation
+
+
+def claim_repair(timeout: float) -> tuple[str, int, str, BookingPlan | None] | None:
     with session_scope() as db:
         db.connection().exec_driver_sql("BEGIN IMMEDIATE")
         expired = utcnow() - timedelta(seconds=timeout + 60)
@@ -127,15 +205,26 @@ def claim_repair(timeout: float) -> tuple[str, int, str] | None:
             )),
         ).order_by(JiraWorkflowOperation.created_at).limit(1))
         if operation is None:
+            operation = _next_unplanned_handoff(db)
+        if operation is None:
             return None
+        saved_plan = (operation.result or {}).get("plan")
+        plan = BookingPlan.model_validate(saved_plan) if saved_plan else None
         operation.status = "running"
         operation.attempts += 1
-        return operation.operation_id, operation.attempts, operation.payload["approved_report"]
+        return operation.operation_id, operation.attempts, operation.payload["approved_report"], plan
 
 
-async def execute_repair(op_id: str, attempt: int, report: str, run_agent, cancel: asyncio.Event, timeout: float) -> None:
+async def execute_repair(
+    op_id: str, attempt: int, report: str, plan: BookingPlan | None, run_agent, cancel: asyncio.Event, timeout: float,
+) -> None:
+    planning = plan is None
     try:
-        result = await repair_booking(report, run_agent, cancel, timeout)
+        if plan is None:
+            plan = await plan_booking(report, run_agent, cancel, timeout)
+            result = {"status": "pending"}
+        else:
+            result = await repair_booking(report, plan, run_agent, cancel, timeout)
     except (OSError, RuntimeError, TimeoutError) as exc:
         result = {"status": "failed", "error": redact(str(exc) or type(exc).__name__)[:1200]}
     with session_scope() as db:
@@ -146,9 +235,14 @@ async def execute_repair(op_id: str, attempt: int, report: str, run_agent, cance
         if cancel.is_set():
             op.status = "pending"
             return
+        if plan is not None:
+            result["plan"] = plan.model_dump(mode="json")
+            if planning and db.get(JiraWorkflowRun, op.run_id).state == JiraWorkflowState.READY_FOR_HANDOFF:
+                result["status"] = "planned"
         op.status = result["status"]
         op.result = result
         db.add(JiraWorkflowEvent(
-            run_id=op.run_id, event_id=f"{op_id}:{attempt}:result", event_type="workshop.booking_repair_result",
-            payload={"status": op.status},
+            run_id=op.run_id, event_id=f"{op_id}:{attempt}:result",
+            event_type="workshop.booking_plan_result" if planning else "workshop.booking_repair_result",
+            payload={"status": "planned" if planning and plan is not None else op.status},
         ))

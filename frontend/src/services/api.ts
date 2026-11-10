@@ -374,7 +374,14 @@ interface JiraRunDetail {
   run: JiraRun;
   issue: TrainingIssue | null;
   reporter_slack_id: string;
-  repair: { status: string; summary: string | null; patch: string | null; test_output: string | null; error: string | null } | null;
+  repair: {
+    status: string;
+    plan: { goal: string; steps: string[]; acceptance_criteria: string[] } | null;
+    summary: string | null;
+    patch: string | null;
+    test_output: string | null;
+    error: string | null;
+  } | null;
   drafts: { version: number; status: string; decision: string | null; decided_at: string | null }[];
   timeline: JiraTimelineEntry[];
 }
@@ -389,7 +396,7 @@ interface SlackPairing {
 export const api = {
   jiraRuns: () => request<JiraRun[]>("/api/jira/workshop/runs"),
   jiraRun: (id: string) => request<JiraRunDetail>(`/api/jira/workshop/runs/${encodeURIComponent(id)}`),
-  jiraHandoff: (id: string, action: "start" | "finish") =>
+  jiraHandoff: (id: string, action: "start" | "finish" | "retry-plan") =>
     request<JiraRun>(`/api/jira/workshop/runs/${encodeURIComponent(id)}/actions/${action}`, { method: "POST" }),
   slackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing"),
   startSlackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing", { method: "POST" }),

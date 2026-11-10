@@ -19,7 +19,7 @@ it("opens a Jira card in the right sheet and keeps the board visible after closi
     issue: { issue_key: "LAB-3", title: "Double booking", status: "new", description_text: "Booking issue." },
     drafts: [{ version: 1, status: "approved", decision: "approve", decided_at: null }],
     timeline: [],
-    repair: { status: "passed", summary: "Fixed race", patch: null, test_output: "2 passed", error: null },
+    repair: { status: "passed", plan: { goal: "Avoid double booking", steps: ["Check capacity after awaiting"], acceptance_criteria: ["Only one reservation"] }, summary: "Fixed race", patch: null, test_output: "2 passed", error: null },
   });
   renderWithProviders(<JiraWorkflowPage />);
 
@@ -32,11 +32,26 @@ it("opens a Jira card in the right sheet and keeps the board visible after closi
   expect(within(sheet).getByText("Jira New")).toBeInTheDocument();
   expect(within(sheet).getByRole("button", { name: "Завершити" })).toBeEnabled();
   const tabs = within(sheet).getAllByRole("tab");
-  expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(["Overview", "Timeline", "Drafts", "Diff", "Validation", "Slack"]);
+  expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(["Overview", "Timeline", "Drafts", "Plan", "Diff", "Validation", "Slack"]);
+  fireEvent.mouseDown(within(sheet).getByRole("tab", { name: "Plan" }), { button: 0, ctrlKey: false });
+  expect(within(sheet).getByText("Avoid double booking")).toBeInTheDocument();
   fireEvent.mouseDown(within(sheet).getByRole("tab", { name: "Validation" }), { button: 0, ctrlKey: false });
   expect(within(sheet).getByText("2 passed")).toBeInTheDocument();
 
   fireEvent.click(within(sheet).getByRole("button", { name: "Close task details" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Double booking" })).toBeInTheDocument();
+});
+
+it("disables Start while a ready ticket is waiting for its plan", async () => {
+  vi.spyOn(api, "jiraRuns").mockResolvedValue([{
+    run_id: "run-4", issue_key: "LAB-4", title: "Waiting for a plan",
+    source_kind: "training", state: "ready_for_handoff", repair_status: "running",
+    last_error: null, thread_url: null,
+  }]);
+  vi.spyOn(api, "slackPairing").mockResolvedValue({ state: "idle", code: null, slack_user_id: null, reporter_id: null });
+  renderWithProviders(<JiraWorkflowPage />);
+
+  expect(await screen.findByRole("button", { name: "Планування…" })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Взяти в роботу" })).not.toBeInTheDocument();
 });

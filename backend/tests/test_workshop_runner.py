@@ -1,14 +1,19 @@
 import asyncio
+import json
 import sys
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.agents.workshop import StageInput
+from app.api.workshop_runs import change_handoff_state
 from app.config import get_settings
 from app.db import session_scope
+from app.integrations.claude_runner import AgentResult
 from app.integrations.training_jira import TrainingJira
-from app.models.jira_workflow import JiraWorkflowEvent, JiraWorkflowProfile, JiraWorkflowRun
+from app.models.jira_workflow import JiraWorkflowEvent, JiraWorkflowOperation, JiraWorkflowProfile, JiraWorkflowRun
+from app.orchestration.booking_repair import KIND, claim_repair, execute_repair
 from app.orchestration.worker import Worker
 
 RUN_ID = "run-workshop"
@@ -160,3 +165,44 @@ print(json.dumps({'type':'result','structured_output':{
     attempt = await Worker().run_workshop_stage(RUN_ID, StageInput(stage="reply", issue=issue), asyncio.Event())
     assert attempt.status == "failed"
     assert "too_long" in _finished(attempt.attempt_id)["error"]
+
+
+async def test_booking_plan_is_persisted_before_repair_and_reused(issue):
+    op_id = f"{RUN_ID}:booking-repair"
+    with session_scope() as db:
+        db.get(JiraWorkflowRun, RUN_ID).state = "ready_for_handoff"
+        db.add(JiraWorkflowOperation(
+            operation_id=op_id, run_id=RUN_ID, kind=KIND, status="pending",
+            payload={"approved_report": "Report"},
+        ))
+    plan = {"goal": "Avoid double booking", "steps": ["Recheck capacity"], "acceptance_criteria": ["One confirmation"]}
+    calls = []
+
+    async def agent(spec, *_):
+        calls.append(spec.agent)
+        payload = json.loads(spec.prompt)
+        if spec.agent == "workshop-planning":
+            assert "plan" not in payload
+            return AgentResult(status="succeeded", structured=plan)
+        assert payload["plan"] == plan
+        return AgentResult(status="failed", error="Execution failed")
+
+    cancel = asyncio.Event()
+    with pytest.raises(HTTPException, match="implementation plan must be ready"), session_scope() as db:
+        change_handoff_state(RUN_ID, "start", db)
+    claim = claim_repair(5)
+    assert claim and claim[-1] is None
+    await execute_repair(*claim, agent, cancel, 5)
+    with session_scope() as db:
+        op = db.get(JiraWorkflowOperation, op_id)
+        assert op.status == "planned" and op.result["plan"] == plan
+    assert claim_repair(5) is None
+    with session_scope() as db:
+        assert change_handoff_state(RUN_ID, "start", db).state == "in_progress"
+    claim = claim_repair(5)
+    assert claim and claim[-1].model_dump() == plan
+    await execute_repair(*claim, agent, cancel, 5)
+    with session_scope() as db:
+        op = db.get(JiraWorkflowOperation, op_id)
+        assert op.status == "failed" and op.result["plan"] == plan
+    assert calls == ["workshop-planning", None]

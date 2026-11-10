@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Bell, ExternalLink, FileDiff, LayoutDashboard, ListTree, MessageSquareText, ShieldCheck } from "lucide-react";
+import { Bell, ClipboardList, ExternalLink, FileDiff, LayoutDashboard, ListTree, MessageSquareText, ShieldCheck } from "lucide-react";
 import { DiffView } from "@/components/common/DiffView";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -20,6 +20,7 @@ const eventLabels: Record<string, string> = {
   "workshop.subagent_started": "Subagent started",
   "workshop.subagent_finished": "Subagent finished",
   "workshop.handoff_start": "Booking repair queued",
+  "workshop.booking_plan_result": "Booking repair plan",
   "workshop.booking_repair_result": "Booking repair verification",
   "workshop.handoff_finish": "Agent work marked complete",
 };
@@ -69,6 +70,7 @@ function JiraRunDetail({ runId }: { runId: string }) {
           <TabsTrigger value="overview"><LayoutDashboard aria-hidden /> Overview</TabsTrigger>
           <TabsTrigger value="timeline"><ListTree aria-hidden /> Timeline</TabsTrigger>
           <TabsTrigger value="drafts"><MessageSquareText aria-hidden /> Drafts</TabsTrigger>
+          <TabsTrigger value="plan"><ClipboardList aria-hidden /> Plan</TabsTrigger>
           <TabsTrigger value="diff"><FileDiff aria-hidden /> Diff</TabsTrigger>
           <TabsTrigger value="validation"><ShieldCheck aria-hidden /> Validation</TabsTrigger>
           <TabsTrigger value="slack"><Bell aria-hidden /> Slack</TabsTrigger>
@@ -116,6 +118,25 @@ function JiraRunDetail({ runId }: { runId: string }) {
                 </li>
               ))}
             </ul>
+          </TabsContent>
+          <TabsContent value="plan" className="space-y-4 text-sm">
+            {repair?.plan ? (
+              <>
+                <section><h3 className="font-semibold">Goal</h3><p>{repair.plan.goal}</p></section>
+                <section>
+                  <h3 className="font-semibold">Steps</h3>
+                  <ol className="list-decimal space-y-1 pl-5">
+                    {repair.plan.steps.map((step, index) => <li key={index}>{step}</li>)}
+                  </ol>
+                </section>
+                <section>
+                  <h3 className="font-semibold">Acceptance criteria</h3>
+                  <ul className="list-disc space-y-1 pl-5">
+                    {repair.plan.acceptance_criteria.map((criterion, index) => <li key={index}>{criterion}</li>)}
+                  </ul>
+                </section>
+              </>
+            ) : <p className="text-muted">{repair?.error ?? "No plan yet."}</p>}
           </TabsContent>
           <TabsContent value="diff" className="space-y-3">
             {repair?.summary && <p className="text-sm">{repair.summary}</p>}
