@@ -20,7 +20,10 @@ from app.integrations.claude_runner import AgentResult, AgentSpec
 from app.models.jira_workflow import JiraWorkflowEvent, JiraWorkflowRun
 from app.services.redaction import redact
 
+TRIAGE_AGENT = "workshop-triage"
 SPECIALISTS = ("workshop-investigation", "workshop-communication", "workshop-action")
+TONE_OF_VOICE = Path("skills/workshop-tone-of-voice")
+SUBAGENT_HOOK = Path("hooks/record_subagent.py")
 
 
 @dataclass
@@ -32,8 +35,21 @@ class WorkshopAttempt:
 
 
 def _prepare_workspace(workspace: Path) -> None:
-    shutil.copytree(REPO_ROOT / "demo/jira-workshop/.claude", workspace / ".claude",
-                    ignore=shutil.ignore_patterns("subagents.jsonl", "__pycache__"))
+    source = REPO_ROOT / ".claude"
+    profile = workspace / ".claude"
+    (profile / "agents").mkdir(parents=True)
+    for name in (TRIAGE_AGENT, *SPECIALISTS):
+        agent = Path("agents") / f"{name}.md"
+        shutil.copyfile(source / agent, profile / agent)
+    shutil.copytree(source / TONE_OF_VOICE, profile / TONE_OF_VOICE)
+    (profile / SUBAGENT_HOOK.parent).mkdir()
+    shutil.copyfile(source / SUBAGENT_HOOK, profile / SUBAGENT_HOOK)
+
+    hooks = json.loads((source / "settings.json").read_text(encoding="utf-8")).get("hooks", {})
+    (profile / "settings.json").write_text(json.dumps({
+        "env": {"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"},
+        "hooks": {event: hooks[event] for event in ("SubagentStart", "SubagentStop") if event in hooks},
+    }), encoding="utf-8")
     for path in EVIDENCE_PATHS:
         target = workspace / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -130,7 +146,7 @@ async def run_workshop_stage(run_id: str, request: StageInput, cancel,
                 allowed_tools=[*(f"Agent({role})" for role in SPECIALISTS),
                                *(f"Read(./{path})" for path in EVIDENCE_PATHS), "StructuredOutput"],
                 json_schema=claude_output_schema(contract),
-                agent="workshop-triage", cwd=workspace, output_language="Ukrainian",
+                agent=TRIAGE_AGENT, cwd=workspace, output_language="Ukrainian",
                 timeout=get_settings().jira_workshop_agent_timeout_seconds,
             )
             try:

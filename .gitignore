@@ -29,3 +29,4 @@ frontend/dist/
 .idea/
 .vscode/
 .claude/settings.local.json
+.claude/hooks/subagents.jsonl

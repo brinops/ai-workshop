@@ -60,6 +60,12 @@ assert 'Ukrainian' in args[args.index('--append-system-prompt') + 1]
 assert 'Read(./demo/booking/service.py)' in args and 'Read' not in args
 assert Path('.claude/agents/workshop-investigation.md').is_file()
 assert Path('.claude/skills/workshop-tone-of-voice/SKILL.md').is_file()
+assert not Path('.claude/agents/k8s-remediator.md').exists()
+assert not Path('.claude/skills/k8s-failure-analysis').exists()
+assert not Path('.claude/hooks/register_pr.py').exists()
+settings = json.loads(Path('.claude/settings.json').read_text())
+assert set(settings['hooks']) == {'SubagentStart', 'SubagentStop'}
+assert settings['env']['CLAUDE_CODE_DISABLE_BACKGROUND_TASKS'] == '1'
 assert Path('demo/booking/service.py').is_file()
 assert not Path('demo/booking/scenario.json').exists()
 request = json.load(sys.stdin)

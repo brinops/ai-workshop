@@ -85,7 +85,7 @@ def prepare_agent_home() -> Path:
         if (dst / sub).exists():
             shutil.rmtree(dst / sub)
         if src.exists():
-            shutil.copytree(src, dst / sub)
+            shutil.copytree(src, dst / sub, ignore=shutil.ignore_patterns("workshop-*"))
     (dst / "settings.json").write_text(json.dumps({
         "permissions": {"deny": ["WebFetch", "WebSearch", "Bash(git push:*)", "Bash(gh:*)", "Bash(curl:*)"]},
     }, indent=2))
