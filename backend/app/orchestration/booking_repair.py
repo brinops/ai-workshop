@@ -10,13 +10,14 @@ from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import indent
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import REPO_ROOT
+from app.control_plane import AgentName, get_config
 from app.db import session_scope, utcnow
 from app.integrations.claude_runner import AgentSpec
 from app.models.jira_workflow import (
@@ -40,12 +41,33 @@ SCHEMA = {
 PlanText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
 
-class BookingPlan(BaseModel):
+class PlanContent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     goal: PlanText
     steps: list[PlanText] = Field(min_length=1, max_length=5)
     acceptance_criteria: list[PlanText] = Field(min_length=1, max_length=5)
+
+
+class RouteSelection(PlanContent):
+    route: AgentName | None
+
+
+class SelectedRoute(BaseModel):
+    id: AgentName
+    execution_agent: AgentName
+    qa_agent: AgentName
+
+
+class BookingPlan(PlanContent):
+    route: SelectedRoute | None = None
+
+
+class BookingQA(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    verdict: Literal["approved", "changes_required"]
+    summary: PlanText
 
 
 ALLOWED_NODES = (
@@ -98,32 +120,43 @@ async def _verify(workspace: Path) -> tuple[int, str]:
     return process.returncode, output.decode(errors="replace")
 
 
-async def plan_booking(report: str, run_agent, cancel: asyncio.Event, timeout: float) -> BookingPlan:
-    with TemporaryDirectory(prefix="workshop-planning-") as directory:
-        workspace = Path(directory)
-        agents = workspace / ".claude" / "agents"
-        agents.mkdir(parents=True)
-        name = "workshop-planning"
-        shutil.copyfile(REPO_ROOT / ".claude" / "agents" / f"{name}.md", agents / f"{name}.md")
-        spec = AgentSpec(
-            prompt=json.dumps({
-                "approved_report": report,
-                "source": (REPO_ROOT / FIXTURE / "service.py").read_text(encoding="utf-8"),
-                "test": (REPO_ROOT / FIXTURE / "test_booking.py").read_text(encoding="utf-8"),
-            }, ensure_ascii=False),
-            agent=name, tools=["StructuredOutput"], allowed_tools=["StructuredOutput"],
-            json_schema=BookingPlan.model_json_schema(), cwd=workspace, timeout=timeout, output_language="Ukrainian",
-        )
-        result = await run_agent(spec, lambda *_: None, cancel, None)
+async def _run_booking_agent(name, payload, schema, workspace, run_agent, cancel, timeout):
+    agents = workspace / ".claude" / "agents"
+    agents.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(REPO_ROOT / ".claude" / "agents" / f"{name}.md", agents / f"{name}.md")
+    spec = AgentSpec(
+        prompt=json.dumps(payload, ensure_ascii=False), agent=name, tools=["StructuredOutput"],
+        allowed_tools=["StructuredOutput"], json_schema=schema, cwd=workspace, timeout=timeout,
+        output_language="Ukrainian",
+    )
+    result = await run_agent(spec, lambda *_: None, cancel, None)
     if result.status != "succeeded":
-        raise RuntimeError(result.error or f"Planning agent {result.status}")
+        raise RuntimeError(result.error or f"{name}: {result.status}")
+    return result.structured
+
+
+async def plan_booking(report: str, run_agent, cancel: asyncio.Event, timeout: float) -> BookingPlan:
+    routes = get_config().jira_routes
+    if not routes:
+        raise RuntimeError("No Jira routes configured")
+    with TemporaryDirectory(prefix="workshop-planning-") as directory:
+        output = await _run_booking_agent("workshop-planning", {
+            "approved_report": report,
+            "routes": {key: route.description for key, route in routes.items()},
+            "source": (REPO_ROOT / FIXTURE / "service.py").read_text(encoding="utf-8"),
+            "test": (REPO_ROOT / FIXTURE / "test_booking.py").read_text(encoding="utf-8"),
+        }, RouteSelection.model_json_schema(), Path(directory), run_agent, cancel, timeout)
     try:
-        plan = BookingPlan.model_validate(result.structured)
+        plan = RouteSelection.model_validate(output)
     except ValidationError as exc:
         raise RuntimeError("Planning agent returned an invalid plan") from exc
+    route = routes.get(plan.route) if plan.route else None
+    if route is None:
+        raise RuntimeError("Planner did not select a configured Jira route")
     return BookingPlan(
         goal=redact(plan.goal), steps=[redact(step) for step in plan.steps],
         acceptance_criteria=[redact(criterion) for criterion in plan.acceptance_criteria],
+        route=SelectedRoute(id=plan.route, execution_agent=route.execution_agent, qa_agent=route.qa_agent),
     )
 
 
@@ -136,34 +169,50 @@ async def repair_booking(report: str, plan: BookingPlan, run_agent, cancel: asyn
         source = (REPO_ROOT / FIXTURE / "service.py").read_text(encoding="utf-8")
         source_path.write_text(source, encoding="utf-8")
         shutil.copyfile(REPO_ROOT / FIXTURE / "test_booking.py", fixture / "test_booking.py")
-        spec = AgentSpec(
-            prompt=json.dumps({"task": "Implement the approved booking report using the implementation plan. Return the complete unindented body of "
-                               "BookingService.reserve(self, user_id), with no signature or Markdown, "
-                               "and a short summary of the code change. The worker reports tests separately. "
-                               "Use only the existing eligibility call, seat counter, "
-                               "confirmed/waitlist append, and return statuses. Keep the async eligibility check.",
-                               "approved_report": report, "plan": plan.model_dump(), "source": source,
-                               "test": (fixture / "test_booking.py").read_text(encoding="utf-8")}, ensure_ascii=False),
-            tools=["StructuredOutput"], allowed_tools=["StructuredOutput"], json_schema=SCHEMA,
-            cwd=workspace, timeout=timeout, output_language="Ukrainian",
-        )
-        result = await run_agent(spec, lambda *_: None, cancel, None)
-        if result.status != "succeeded" or not isinstance(result.structured, dict):
-            return {"status": "failed", "error": redact(result.error or f"Agent {result.status}")[:1200]}
+        route = plan.route
+        if route is None:
+            raise RuntimeError("The booking plan must have a Jira route")
+        output = await _run_booking_agent(route.execution_agent, {
+            "task": "Implement the saved plan. Return the unindented body of BookingService.reserve(self, user_id) "
+                    "with no signature or Markdown. Use only the existing eligibility call, seat counter, "
+                    "confirmed/waitlist append, and return statuses. Keep the async eligibility check.",
+            "approved_report": report, "plan": plan.model_dump(), "source": source,
+            "test": (fixture / "test_booking.py").read_text(encoding="utf-8"),
+        }, SCHEMA, workspace, run_agent, cancel, timeout)
+        if not isinstance(output, dict):
+            return {"status": "failed", "error": "Execution agent returned an invalid patch"}
         try:
-            updated = candidate_source(source, result.structured.get("body"))
+            updated = candidate_source(source, output.get("body"))
         except (SyntaxError, ValueError) as exc:
             return {"status": "failed", "error": redact(str(exc))[:1200]}
         source_path.write_text(updated, encoding="utf-8")
         patch = "".join(difflib.unified_diff(source.splitlines(True), updated.splitlines(True),
                                              fromfile=f"a/{FIXTURE}/service.py", tofile=f"b/{FIXTURE}/service.py"))
-        code, output = await _verify(workspace)
-        return {
-            "status": "passed" if code == 0 and patch else "failed",
-            "summary": redact(str(result.structured.get("summary", "")))[:1200],
-            "patch": patch, "test_output": redact(output)[:5000],
-            "error": None if code == 0 and patch else "Booking verification did not pass",
+        code, test_output = await _verify(workspace)
+        result = {
+            "status": "failed", "summary": redact(str(output.get("summary", "")))[:1200],
+            "patch": patch, "test_output": redact(test_output)[:5000], "tests_passed": code == 0,
+            "error": "Booking verification did not pass",
         }
+        if code != 0 or not patch or cancel.is_set():
+            return result
+        try:
+            review = await _run_booking_agent(route.qa_agent, {
+                "plan": plan.model_dump(), "patch": patch, "test_output": result["test_output"],
+            }, BookingQA.model_json_schema(), workspace, run_agent, cancel, timeout)
+            qa = BookingQA.model_validate(review)
+        except ValidationError:
+            result["error"] = "QA agent returned an invalid verdict"
+            return result
+        except (OSError, RuntimeError, TimeoutError) as exc:
+            result["error"] = redact(str(exc) or type(exc).__name__)[:1200]
+            return result
+        result["qa"] = {"verdict": qa.verdict, "summary": redact(qa.summary)}
+        if qa.verdict == "approved":
+            result.update(status="passed", error=None)
+        else:
+            result["error"] = "QA requested changes"
+        return result
 
 
 def _next_unplanned_handoff(db: Session) -> JiraWorkflowOperation | None:
@@ -197,10 +246,13 @@ def _next_unplanned_handoff(db: Session) -> JiraWorkflowOperation | None:
 def claim_repair(timeout: float) -> tuple[str, int, str, BookingPlan | None] | None:
     with session_scope() as db:
         db.connection().exec_driver_sql("BEGIN IMMEDIATE")
-        expired = utcnow() - timedelta(seconds=timeout + 60)
+        expired = utcnow() - timedelta(seconds=2 * timeout + 60)
         operation = db.scalar(select(JiraWorkflowOperation).where(
             JiraWorkflowOperation.kind == KIND,
             or_(JiraWorkflowOperation.status == "pending", and_(
+                JiraWorkflowOperation.status == "planned",
+                JiraWorkflowOperation.result["plan"]["route"]["id"].as_string().is_(None),
+            ), and_(
                 JiraWorkflowOperation.status == "running", JiraWorkflowOperation.updated_at < expired,
             )),
         ).order_by(JiraWorkflowOperation.created_at).limit(1))
@@ -209,7 +261,7 @@ def claim_repair(timeout: float) -> tuple[str, int, str, BookingPlan | None] | N
         if operation is None:
             return None
         saved_plan = (operation.result or {}).get("plan")
-        plan = BookingPlan.model_validate(saved_plan) if saved_plan else None
+        plan = BookingPlan.model_validate(saved_plan) if saved_plan and saved_plan.get("route") else None
         operation.status = "running"
         operation.attempts += 1
         return operation.operation_id, operation.attempts, operation.payload["approved_report"], plan
@@ -241,6 +293,16 @@ async def execute_repair(
                 result["status"] = "planned"
         op.status = result["status"]
         op.result = result
+        if "tests_passed" in result:
+            db.add(JiraWorkflowEvent(
+                run_id=op.run_id, event_id=f"{op_id}:{attempt}:tests", event_type="workshop.booking_tests_result",
+                payload={"status": "passed" if result["tests_passed"] else "failed"},
+            ))
+        if result.get("qa"):
+            db.add(JiraWorkflowEvent(
+                run_id=op.run_id, event_id=f"{op_id}:{attempt}:qa", event_type="workshop.booking_qa_result",
+                payload={"status": result["qa"]["verdict"], "agent_type": plan.route.qa_agent},
+            ))
         db.add(JiraWorkflowEvent(
             run_id=op.run_id, event_id=f"{op_id}:{attempt}:result",
             event_type="workshop.booking_plan_result" if planning else "workshop.booking_repair_result",

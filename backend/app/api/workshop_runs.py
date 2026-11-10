@@ -19,7 +19,7 @@ from app.models.jira_workflow import (
     JiraWorkflowState,
 )
 from app.models.training_jira import TrainingIssue
-from app.orchestration.booking_repair import BookingPlan
+from app.orchestration.booking_repair import BookingPlan, BookingQA
 
 router = APIRouter(prefix="/api/jira/workshop/runs", tags=["Workshop runs"])
 Database = Annotated[Session, Depends(get_db)]
@@ -61,6 +61,7 @@ class DraftSummary(BaseModel):
 class RepairResult(BaseModel):
     status: str
     plan: BookingPlan | None = None
+    qa: BookingQA | None = None
     summary: str | None = None
     patch: str | None = None
     test_output: str | None = None
@@ -163,7 +164,7 @@ def change_handoff_state(run_id: str, action: Literal["start", "finish", "retry-
             raise HTTPException(409, "the implementation plan must be ready before starting")
         if run.state == state.IN_PROGRESS and repair.status != "failed":
             return summarize(run, repair.status)
-        if repair.status not in ("planned", "failed"):
+        if not repair.result["plan"].get("route") or repair.status not in ("planned", "failed"):
             raise HTTPException(409, "the implementation plan must be ready before starting")
         repair.status = "pending"
         repair.result = {"status": "pending", "plan": repair.result["plan"]}

@@ -21,6 +21,8 @@ const eventLabels: Record<string, string> = {
   "workshop.subagent_finished": "Subagent finished",
   "workshop.handoff_start": "Booking repair queued",
   "workshop.booking_plan_result": "Booking repair plan",
+  "workshop.booking_tests_result": "Booking tests",
+  "workshop.booking_qa_result": "QA review",
   "workshop.booking_repair_result": "Booking repair verification",
   "workshop.handoff_finish": "Agent work marked complete",
 };
@@ -122,6 +124,13 @@ function JiraRunDetail({ runId }: { runId: string }) {
           <TabsContent value="plan" className="space-y-4 text-sm">
             {repair?.plan ? (
               <>
+                {repair.plan.route && (
+                  <dl className="space-y-1">
+                    <div><dt className="inline font-semibold">Route · </dt><dd className="inline">{repair.plan.route.id}</dd></div>
+                    <div><dt className="inline font-semibold">Executor · </dt><dd className="inline">{repair.plan.route.execution_agent}</dd></div>
+                    <div><dt className="inline font-semibold">QA · </dt><dd className="inline">{repair.plan.route.qa_agent}</dd></div>
+                  </dl>
+                )}
                 <section><h3 className="font-semibold">Goal</h3><p>{repair.plan.goal}</p></section>
                 <section>
                   <h3 className="font-semibold">Steps</h3>
@@ -143,6 +152,12 @@ function JiraRunDetail({ runId }: { runId: string }) {
             {repair?.patch ? <DiffView diff={repair.patch} /> : <p className="text-sm text-muted">No patch yet.</p>}
           </TabsContent>
           <TabsContent value="validation" className="space-y-3">
+            {repair?.qa && (
+              <section className="space-y-1 text-sm">
+                <h3 className="font-semibold">QA · {humanize(repair.qa.verdict)}</h3>
+                <p>{repair.qa.summary}</p>
+              </section>
+            )}
             {repair?.error && <p className="text-sm text-bad">{repair.error}</p>}
             {repair?.test_output ? (
               <pre className="overflow-x-auto rounded-md border border-line bg-sunken p-3 font-mono text-xs">{repair.test_output}</pre>

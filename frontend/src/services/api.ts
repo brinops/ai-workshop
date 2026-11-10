@@ -376,7 +376,11 @@ interface JiraRunDetail {
   reporter_slack_id: string;
   repair: {
     status: string;
-    plan: { goal: string; steps: string[]; acceptance_criteria: string[] } | null;
+    plan: {
+      goal: string; steps: string[]; acceptance_criteria: string[];
+      route?: { id: string; execution_agent: string; qa_agent: string } | null;
+    } | null;
+    qa?: { verdict: "approved" | "changes_required"; summary: string } | null;
     summary: string | null;
     patch: string | null;
     test_output: string | null;

@@ -11,6 +11,7 @@ import fnmatch
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -74,8 +75,18 @@ class Repository(BaseModel):
         return any(fnmatch.fnmatch(branch, pat) for pat in self.protected_branches)
 
 
+AgentName = Annotated[str, Field(pattern=NAME_RE)]
+
+
+class JiraRoute(BaseModel):
+    description: str = Field(min_length=1)
+    execution_agent: AgentName
+    qa_agent: AgentName
+
+
 class ControlPlaneConfig(BaseModel):
     repositories: list[Repository] = Field(min_length=1)
+    jira_routes: dict[AgentName, JiraRoute] = Field(default_factory=dict)
 
     def repository(self, repo: str) -> Repository | None:
         return next((r for r in self.repositories if r.repo.lower() == repo.lower()), None)
@@ -92,6 +103,10 @@ class ControlPlaneConfig(BaseModel):
                     out.append(f"{where}: agent .claude/agents/{r.remediation_agent}.md not found")
                 if not (root / r.validator).is_file():
                     out.append(f"{where}: validator {r.validator} not found")
+        for route_id, route in self.jira_routes.items():
+            for name in (route.execution_agent, route.qa_agent):
+                if not (root / ".claude" / "agents" / f"{name}.md").is_file():
+                    out.append(f"Jira → {route_id}: agent .claude/agents/{name}.md not found")
         return out
 
 

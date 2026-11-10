@@ -3,7 +3,7 @@
 # Domain knowledge lives in the standard .claude/ layout:
 #   .claude/skills/<analysis_skill>/SKILL.md      Analysis Skill (+ scripts/ such as the validator)
 #   .claude/agents/<remediation_agent>.md         Remediation Subagent
-# This file only wires them together. A route is chosen by the name of the *failed CI check*
+# This file only wires them together. A CI route is chosen by the name of the *failed CI check*
 # (deterministic — never by asking the model), and its allowed_paths are enforced by the backend
 # on the produced diff, whatever the agent claims.
 #
@@ -32,3 +32,10 @@ repositories:
 #        remediation_agent: terraform-remediator
 #        validator: .claude/skills/terraform-failure-analysis/scripts/validate.py
 #        allowed_paths: ["infra/**"]
+
+# Jira Planner selects one of these IDs. The worker saves both agent names with the plan.
+jira_routes:
+  booking-backend:
+    description: Python backend race in the workshop's BookingService.reserve fixture.
+    execution_agent: workshop-booking-backend
+    qa_agent: workshop-booking-qa

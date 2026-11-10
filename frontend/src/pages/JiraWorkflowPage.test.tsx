@@ -19,7 +19,7 @@ it("opens a Jira card in the right sheet and keeps the board visible after closi
     issue: { issue_key: "LAB-3", title: "Double booking", status: "new", description_text: "Booking issue." },
     drafts: [{ version: 1, status: "approved", decision: "approve", decided_at: null }],
     timeline: [],
-    repair: { status: "passed", plan: { goal: "Avoid double booking", steps: ["Check capacity after awaiting"], acceptance_criteria: ["Only one reservation"] }, summary: "Fixed race", patch: null, test_output: "2 passed", error: null },
+    repair: { status: "passed", plan: { goal: "Avoid double booking", steps: ["Check capacity after awaiting"], acceptance_criteria: ["Only one reservation"], route: { id: "booking-backend", execution_agent: "workshop-booking-backend", qa_agent: "workshop-booking-qa" } }, qa: { verdict: "approved", summary: "Criteria met." }, summary: "Fixed race", patch: null, test_output: "2 passed", error: null },
   });
   renderWithProviders(<JiraWorkflowPage />);
 
@@ -35,8 +35,10 @@ it("opens a Jira card in the right sheet and keeps the board visible after closi
   expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(["Overview", "Timeline", "Drafts", "Plan", "Diff", "Validation", "Slack"]);
   fireEvent.mouseDown(within(sheet).getByRole("tab", { name: "Plan" }), { button: 0, ctrlKey: false });
   expect(within(sheet).getByText("Avoid double booking")).toBeInTheDocument();
+  expect(within(sheet).getByText("workshop-booking-backend")).toBeInTheDocument();
   fireEvent.mouseDown(within(sheet).getByRole("tab", { name: "Validation" }), { button: 0, ctrlKey: false });
   expect(within(sheet).getByText("2 passed")).toBeInTheDocument();
+  expect(within(sheet).getByText("Criteria met.")).toBeInTheDocument();
 
   fireEvent.click(within(sheet).getByRole("button", { name: "Close task details" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

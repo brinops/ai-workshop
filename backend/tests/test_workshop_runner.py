@@ -8,7 +8,8 @@ from sqlalchemy import select
 
 from app.agents.workshop import StageInput
 from app.api.workshop_runs import change_handoff_state
-from app.config import get_settings
+from app.config import REPO_ROOT, get_settings
+from app.control_plane import get_config
 from app.db import session_scope
 from app.integrations.claude_runner import AgentResult
 from app.integrations.training_jira import TrainingJira
@@ -167,7 +168,10 @@ print(json.dumps({'type':'result','structured_output':{
     assert "too_long" in _finished(attempt.attempt_id)["error"]
 
 
-async def test_booking_plan_is_persisted_before_repair_and_reused(issue):
+async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeypatch):
+    monkeypatch.setenv("CONTROL_PLANE_CONFIG", str(REPO_ROOT / "control-plane.yaml"))
+    get_settings.cache_clear()
+    get_config.cache_clear()
     op_id = f"{RUN_ID}:booking-repair"
     with session_scope() as db:
         db.get(JiraWorkflowRun, RUN_ID).state = "ready_for_handoff"
@@ -176,6 +180,9 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue):
             payload={"approved_report": "Report"},
         ))
     plan = {"goal": "Avoid double booking", "steps": ["Recheck capacity"], "acceptance_criteria": ["One confirmation"]}
+    routed_plan = {**plan, "route": {
+        "id": "booking-backend", "execution_agent": "workshop-booking-backend", "qa_agent": "workshop-booking-qa",
+    }}
     calls = []
 
     async def agent(spec, *_):
@@ -183,8 +190,9 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue):
         payload = json.loads(spec.prompt)
         if spec.agent == "workshop-planning":
             assert "plan" not in payload
-            return AgentResult(status="succeeded", structured=plan)
-        assert payload["plan"] == plan
+            assert "booking-backend" in payload["routes"]
+            return AgentResult(status="succeeded", structured={**plan, "route": "booking-backend"})
+        assert payload["plan"] == routed_plan
         return AgentResult(status="failed", error="Execution failed")
 
     cancel = asyncio.Event()
@@ -195,14 +203,14 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue):
     await execute_repair(*claim, agent, cancel, 5)
     with session_scope() as db:
         op = db.get(JiraWorkflowOperation, op_id)
-        assert op.status == "planned" and op.result["plan"] == plan
+        assert op.status == "planned" and op.result["plan"] == routed_plan
     assert claim_repair(5) is None
     with session_scope() as db:
         assert change_handoff_state(RUN_ID, "start", db).state == "in_progress"
     claim = claim_repair(5)
-    assert claim and claim[-1].model_dump() == plan
+    assert claim and claim[-1].model_dump() == routed_plan
     await execute_repair(*claim, agent, cancel, 5)
     with session_scope() as db:
         op = db.get(JiraWorkflowOperation, op_id)
-        assert op.status == "failed" and op.result["plan"] == plan
-    assert calls == ["workshop-planning", None]
+        assert op.status == "failed" and op.result["plan"] == routed_plan
+    assert calls == ["workshop-planning", "workshop-booking-backend"]
