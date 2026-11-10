@@ -7,7 +7,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +56,18 @@ class Settings(BaseSettings):
 
     # --- Slack
     slack_webhook_url: str | None = None
+
+    # --- Jira workshop
+    workshop_slack_router_url: str | None = None
+    workshop_slack_signing_secret: SecretStr | None = None
+    workshop_slack_workspace_id: str | None = None
+    workshop_slack_channel_id: str | None = None
+    workshop_slack_bot_token: SecretStr | None = None
+    workshop_slack_app_token: SecretStr | None = None
+    jira_workshop_profile_id: str | None = None
+    jira_workshop_poll_interval_seconds: float = Field(default=5, ge=0)
+    jira_workshop_agent_timeout_seconds: float = Field(default=120, gt=0)
+    jira_workshop_dialog_enabled: bool = True
 
     # --- worker
     worker_tick_seconds: float = 2.0

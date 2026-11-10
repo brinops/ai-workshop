@@ -45,6 +45,8 @@ class AgentSpec:
     timeout: float = 600
     model: str | None = None
     system_prompt_append: str | None = None
+    cwd: Path | None = None
+    output_language: str = "English"
 
 
 @dataclass
@@ -110,7 +112,7 @@ def build_command(spec: AgentSpec) -> list[str]:
         cmd += ["--agent", spec.agent]
     # Agents run unattended for a machine consumer: pin the language and the result channel,
     # regardless of the operator's personal memory/preferences.
-    append = ("You are running headless inside the CI Control Plane. Write all prose in English. "
+    append = (f"You are running headless inside the CI Control Plane. Write all prose in {spec.output_language}. "
               "Always finish by calling the StructuredOutput tool with your result.")
     if spec.system_prompt_append:
         append += "\n" + spec.system_prompt_append
@@ -174,7 +176,7 @@ async def run_agent(
     cancel: asyncio.Event,
     on_start: Callable[[int], None] | None = None,
 ) -> AgentResult:
-    home = prepare_agent_home()
+    home = spec.cwd if spec.cwd is not None else prepare_agent_home()
     cmd = build_command(spec)
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -189,12 +191,17 @@ async def run_agent(
     if on_start:
         on_start(proc.pid)
     assert proc.stdin and proc.stdout and proc.stderr
-    proc.stdin.write(spec.prompt.encode())
-    await proc.stdin.drain()
-    proc.stdin.close()
-
     state: dict = {}
     stderr_tail: list[str] = []
+
+    async def write_prompt() -> None:
+        try:
+            proc.stdin.write(spec.prompt.encode())
+            await proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            proc.stdin.close()
 
     async def read_stdout() -> None:
         async for raw in proc.stdout:
@@ -215,13 +222,14 @@ async def run_agent(
                 stderr_tail.append(line)
                 del stderr_tail[:-30]
 
-    io = asyncio.gather(read_stdout(), read_stderr(), proc.wait())
+    io = asyncio.gather(write_prompt(), read_stdout(), read_stderr(), proc.wait())
     cancel_wait = asyncio.ensure_future(cancel.wait())
     try:
         done, _ = await asyncio.wait({io, cancel_wait}, timeout=spec.timeout, return_when=asyncio.FIRST_COMPLETED)
     except asyncio.CancelledError:
         await terminate(proc)
         io.cancel()
+        await asyncio.gather(io, return_exceptions=True)
         raise
     finally:
         cancel_wait.cancel()
@@ -229,10 +237,17 @@ async def run_agent(
     if io not in done:
         await terminate(proc)
         io.cancel()
+        await asyncio.gather(io, return_exceptions=True)
         status = "cancelled" if cancel.is_set() else "timeout"
         emit("system", f"agent process {status}")
         return AgentResult(status=status, session_id=state.get("session_id"), model=state.get("model"),
                            exit_code=proc.returncode, error=f"agent {status}")
+
+    try:
+        await io
+    except Exception:
+        await terminate(proc)
+        raise
 
     result = state.get("result") or {}
     structured = result.get("structured_output")

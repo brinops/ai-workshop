@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { StreamProvider } from "@/hooks/StreamProvider";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { JiraWorkflowPage } from "@/pages/JiraWorkflowPage";
 import { ApiError } from "@/services/api";
 
 export function App() {
@@ -30,6 +31,7 @@ export function App() {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/tasks/:taskId" element={<DashboardPage />} />
+                <Route path="/jira-workflow" element={<JiraWorkflowPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </BrowserRouter>

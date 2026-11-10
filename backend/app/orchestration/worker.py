@@ -18,12 +18,14 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
+from time import monotonic
 
 from pydantic import ValidationError
 from sqlalchemy import and_, or_, select, update
 
 from app.agents import analysis as analysis_contract
 from app.agents import remediation as remediation_contract
+from app.agents.workshop import StageInput
 from app.config import get_settings
 from app.control_plane import ControlPlaneConfig, Repository, Route, get_config
 from app.db import session_scope, utcnow
@@ -44,13 +46,21 @@ from app.models import (
     ValidationRun,
     WorkerHeartbeat,
 )
+from app.orchestration.booking_repair import claim_repair, execute_repair
 from app.orchestration.ci import CIOverall, aggregate, extract_findings, log_excerpt
+from app.orchestration.jira_scheduler import discover_training_page
+from app.orchestration.slack_inbox_poll import poll_slack_inbox
+from app.orchestration.slack_thread_queue import deliver_next_thread
 from app.orchestration.state_machine import transition
+from app.orchestration.workshop_approval import accept_approvals, apply_next_approval
+from app.orchestration.workshop_dialog import claim_step, finish_step
+from app.orchestration.workshop_runner import WorkshopAttempt, run_workshop_stage
 from app.services import validation as local_validation
 from app.services.events import add_comment, record_event
 from app.services.redaction import redact
 from app.services.registration import retarget_to_head
 from app.services.settings_store import get_automation
+from app.services.workshop_pairing import active_profile_id
 
 log = logging.getLogger("rcp.worker")
 
@@ -88,6 +98,11 @@ class Worker:
         self.running: dict[int, Running] = {}
         self._stop = asyncio.Event()
         self._gh: GitHubClient | None = None
+        self._jira_next_poll = 0.0
+        self._jira_after = 0
+        self._jira_profile_id: str | None = None
+        self._workshop_job: asyncio.Task | None = None
+        self._repair_job: asyncio.Task | None = None
 
     # ------------------------------------------------------------------ lifecycle
     @property
@@ -123,6 +138,12 @@ class Worker:
         jobs = [r.job for r in self.running.values() if r.job]
         if jobs:
             await asyncio.gather(*jobs, return_exceptions=True)
+        if self._repair_job:
+            self._stop.set()
+            await asyncio.gather(self._repair_job, return_exceptions=True)
+        if self._workshop_job:
+            self._stop.set()
+            await self._workshop_job
         with session_scope() as db:
             db.execute(update(Task).where(Task.lease_owner == self.id).values(lease_owner=None, lease_expires_at=None))
             db.execute(update(AgentRun).where(AgentRun.worker_id == self.id, AgentRun.status == "running")
@@ -144,8 +165,62 @@ class Worker:
                 hb.info = {"pid": os.getpid(), "running": sorted(self.running)}
         self.recover()
         self.watch_running()
+        self.poll_training_jira()
         await self.poll_due_ci()
         self.dispatch()
+        if self.settings.workshop_slack_app_token or self.settings.workshop_slack_router_url:
+            try:
+                await deliver_next_thread(self.settings)
+            except Exception:
+                log.exception("workshop Slack thread delivery failed")
+        if self.settings.workshop_slack_router_url and not self.settings.workshop_slack_app_token:
+            try:
+                await poll_slack_inbox(self.settings.workshop_slack_router_url)
+            except Exception:
+                log.exception("workshop Slack inbox poll failed")
+        if (self.settings.jira_workshop_dialog_enabled
+                and (self.settings.workshop_slack_app_token or self.settings.workshop_slack_router_url)
+                and not self._stop.is_set()
+                and (self._workshop_job is None or self._workshop_job.done())):
+            accept_approvals()
+            apply_next_approval()
+            step = claim_step(self.settings.jira_workshop_agent_timeout_seconds)
+            if step:
+                self._workshop_job = asyncio.create_task(self._advance_workshop(*step), name="workshop-dialog")
+
+        if not self._stop.is_set() and (self._repair_job is None or self._repair_job.done()):
+            timeout = self.settings.jira_workshop_agent_timeout_seconds
+            repair = claim_repair(timeout)
+            if repair:
+                self._repair_job = asyncio.create_task(
+                    execute_repair(*repair, self.deps.run_agent, self._stop, timeout), name="booking-repair",
+                )
+
+    async def _advance_workshop(self, op_id: str, run_id: str, attempt: int, request: StageInput) -> None:
+        try:
+            result = await self.run_workshop_stage(run_id, request, self._stop)
+            finish_step(op_id, attempt, result)
+        except Exception:
+            log.exception("workshop dialogue stage failed unexpectedly")
+
+    async def run_workshop_stage(self, run_id: str, request: StageInput, cancel: asyncio.Event) -> WorkshopAttempt:
+        return await run_workshop_stage(run_id, request, cancel, self.deps.run_agent)
+
+    def poll_training_jira(self) -> None:
+        now = monotonic()
+        if now < self._jira_next_poll:
+            return
+        self._jira_next_poll = now + self.settings.jira_workshop_poll_interval_seconds
+        try:
+            with session_scope() as db:
+                profile_id = active_profile_id(db) or self.settings.jira_workshop_profile_id
+            if profile_id != self._jira_profile_id:
+                self._jira_after = 0
+                self._jira_profile_id = profile_id
+            if profile_id:
+                self._jira_after = discover_training_page(profile_id, self._jira_after)
+        except Exception:
+            log.exception("training Jira poll failed")
 
     def recover(self, startup: bool = False) -> None:
         """Release expired leases left by a dead worker and mark its agent runs as interrupted."""

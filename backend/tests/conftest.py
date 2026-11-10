@@ -26,6 +26,10 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("GITHUB_TOKEN", "test-token")
     monkeypatch.setenv("RUN_WORKER", "false")
     monkeypatch.setenv("CI_POLL_INTERVAL_SECONDS", "0")
+    monkeypatch.delenv("WORKSHOP_SLACK_APP_TOKEN", raising=False)
+    monkeypatch.setenv("JIRA_WORKSHOP_DIALOG_ENABLED", "false")
+    monkeypatch.delenv("JIRA_WORKSHOP_PROFILE_ID", raising=False)
+    monkeypatch.delenv("JIRA_WORKSHOP_POLL_INTERVAL_SECONDS", raising=False)
     monkeypatch.setenv("HEARTBEAT_SECONDS", "1")
     cfg = tmp_path / "control-plane.yaml"
     cfg.write_text(TEST_CONFIG)

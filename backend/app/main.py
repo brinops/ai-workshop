@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import routes, stream
+from app.api import routes, stream, training_jira, workshop_pairing, workshop_runs
 from app.config import REPO_ROOT, get_settings
 from app.control_plane import get_config
 from app.db import init_engine, run_migrations
+from app.integrations.slack_socket import run_socket_mode
 from app.orchestration.worker import Worker
 
 log = logging.getLogger("rcp")
@@ -34,10 +35,21 @@ async def lifespan(app: FastAPI):
         worker = Worker()
         app.state.worker = worker
         worker_job = asyncio.create_task(worker.run_forever(), name="rcp-worker")
-    yield
-    if worker_job:
-        app.state.worker.stop()
-        await asyncio.wait_for(worker_job, timeout=30)
+    socket_job = None
+    if s.workshop_slack_app_token and s.workshop_slack_workspace_id:
+        socket_job = asyncio.create_task(run_socket_mode(
+            s.workshop_slack_app_token.get_secret_value(), s.workshop_slack_workspace_id,
+        ), name="workshop-slack-socket")
+    try:
+        yield
+    finally:
+        if socket_job:
+            socket_job.cancel()
+            with suppress(asyncio.CancelledError):
+                await socket_job
+        if worker_job:
+            app.state.worker.stop()
+            await asyncio.wait_for(worker_job, timeout=30)
 
 
 def create_app() -> FastAPI:
@@ -46,6 +58,9 @@ def create_app() -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_methods=["*"], allow_headers=["*"])
     app.include_router(routes.router)
     app.include_router(stream.router)
+    app.include_router(training_jira.router)
+    app.include_router(workshop_pairing.router)
+    app.include_router(workshop_runs.router)
 
     if DIST.exists():
         app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")

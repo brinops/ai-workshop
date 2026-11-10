@@ -339,7 +339,63 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface JiraRun {
+  run_id: string;
+  title: string | null;
+  issue_key: string;
+  source_kind: string;
+  state: string;
+  thread_url: string | null;
+  last_error: string | null;
+  repair_status: string | null;
+}
+
+export interface JiraTimelineEntry {
+  id: number;
+  event_type: string;
+  received_at: string;
+  outcome: string | null;
+  action: string | null;
+  draft_version: number | null;
+  stage: string | null;
+  agent_type: string | null;
+  hook_status: string | null;
+  status: string | null;
+}
+
+interface TrainingIssue {
+  issue_key: string;
+  title: string;
+  status: string;
+  description_text: string;
+}
+
+interface JiraRunDetail {
+  run: JiraRun;
+  issue: TrainingIssue | null;
+  reporter_slack_id: string;
+  repair: { status: string; summary: string | null; patch: string | null; test_output: string | null; error: string | null } | null;
+  drafts: { version: number; status: string; decision: string | null; decided_at: string | null }[];
+  timeline: JiraTimelineEntry[];
+}
+
+interface SlackPairing {
+  state: "idle" | "pending" | "expired" | "connected";
+  code: string | null;
+  slack_user_id: string | null;
+  reporter_id: string | null;
+}
+
 export const api = {
+  jiraRuns: () => request<JiraRun[]>("/api/jira/workshop/runs"),
+  jiraRun: (id: string) => request<JiraRunDetail>(`/api/jira/workshop/runs/${encodeURIComponent(id)}`),
+  jiraHandoff: (id: string, action: "start" | "finish") =>
+    request<JiraRun>(`/api/jira/workshop/runs/${encodeURIComponent(id)}/actions/${action}`, { method: "POST" }),
+  slackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing"),
+  startSlackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing", { method: "POST" }),
+  createTrainingIssue: (reporterId: string) => request<TrainingIssue>("/api/jira/training/issues", {
+    method: "POST", body: JSON.stringify({ reporter_id: reporterId }),
+  }),
   board: () => request<Board>("/api/board"),
   task: (id: number) => request<TaskDetail>(`/api/tasks/${id}`),
   runLogs: (taskId: number, runId: number, after = 0) =>

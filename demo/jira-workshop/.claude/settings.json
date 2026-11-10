@@ -1,0 +1,31 @@
+{
+  "env": {
+    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"
+  },
+  "hooks": {
+    "SubagentStart": [
+      {
+        "matcher": "^(workshop-investigation|workshop-communication|workshop-action)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/record_subagent.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^(workshop-investigation|workshop-communication|workshop-action)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/record_subagent.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

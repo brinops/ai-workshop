@@ -1,7 +1,13 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.models import Base
+from app.models import (
+    Base,
+    jira_workflow,  # noqa: F401 - registers workshop tables in Base.metadata
+    slack_pairing,  # noqa: F401 - registers shared router pairing table
+    slack_thread,  # noqa: F401 - registers shared router thread receipts
+    training_jira,  # noqa: F401 - registers training Jira tables in Base.metadata
+)
 
 config = context.config
 target_metadata = Base.metadata

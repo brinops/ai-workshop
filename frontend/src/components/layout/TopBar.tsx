@@ -1,4 +1,5 @@
 import { Bot, Monitor, MonitorOff, Moon, Radio, Sun } from "lucide-react";
+import { NavLink, useMatch } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useHealth } from "@/hooks/queries";
@@ -101,6 +102,7 @@ export function TopBar({
   onToggleTheme: () => void;
 }) {
   const { data: health } = useHealth();
+  const jiraWorkflow = useMatch("/jira-workflow");
   const agents = health?.agents_running ?? 0;
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
@@ -132,7 +134,7 @@ export function TopBar({
           <Button variant="ghost" size="icon" onClick={onToggleTheme} aria-label={light ? "Switch to dark theme" : "Switch to light theme"}>
             {light ? <Moon /> : <Sun />}
           </Button>
-          <Button
+          {!jiraWorkflow && <Button
             variant={presenting ? "primary" : "default"}
             size="md"
             onClick={onTogglePresenting}
@@ -140,9 +142,20 @@ export function TopBar({
           >
             {presenting ? <MonitorOff /> : <Monitor />}
             {presenting ? "Exit presentation" : "Presentation mode"}
-          </Button>
+          </Button>}
         </div>
       </div>
+      <nav aria-label="Dashboards" className="flex gap-5 px-5 text-sm">
+        {[{ path: "/", label: "CI Dashboard" }, { path: "/jira-workflow", label: "Jira Workflow" }].map(({ path, label }) => (
+          <NavLink key={path} to={path} className={() => cn(
+            "border-b-2 px-1 py-2 font-medium hover:text-fg",
+            (path === "/jira-workflow" ? jiraWorkflow : !jiraWorkflow)
+              ? "border-accent text-fg" : "border-transparent text-muted",
+          )}>
+            {label}
+          </NavLink>
+        ))}
+      </nav>
     </header>
   );
 }
