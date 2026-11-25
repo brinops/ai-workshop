@@ -1,76 +1,41 @@
-# From Broken PR to Autonomous Recovery
+# Claude Code Subagents: від тікета до дії
 
-A Slidev keynote for the CI Control Plane workshop:
-**Claude Code Hooks, Headless Agents, Skills & Validation Gates**.
-21 slides, 6 chapters, ~25 min of talk + a 10–15 min live demo.
+25 слайдів і нотатки ведучого українською. Орієнтир — 55 хвилин. Учасники пропонують правки в чаті або на папері. Ведучий вносить дві зміни й запускає їх із підготовленого репозиторію.
 
-The deck is self-contained: it needs no backend, no network and no external
-images (fonts are bundled through `@fontsource`).
+## Запуск презентації
 
-## Run
+З каталогу `presentation` виконай:
 
 ```bash
-npm install
-npm run dev        # http://localhost:3030 — opens the browser
+npm ci
+npm run dev
 ```
 
-| Script | What it does |
-|---|---|
-| `npm run dev` | dev server with hot reload |
-| `npm run build` | static SPA in `dist/` (serve with any static server) |
-| `npm run export` | PDF fallback → `dist/keynote.pdf` (final state of every slide) |
-| `npm run export:clicks` | PDF with one page per click step → `dist/keynote-steps.pdf` |
-| `npm run export:png` | one PNG per slide → `dist/png/` |
+- [Слайди](http://localhost:3030/) · [Режим ведучого з нотатками й таймером](http://localhost:3030/presenter/).
+- Стрілки перемикають слайди, пробіл відкриває наступний крок, `f` вмикає повноекранний режим.
+- `npm run build` оновлює статичну збірку в `dist/`.
+- `npm run export` створює PDF, `npm run export:clicks` додає кожен крок розкриття, `npm run export:png` рендерить усі слайди. Якщо Chromium відсутній, виконай `npx playwright install chromium`.
 
-The exports use Playwright. If Chromium is missing, run `npx playwright install chromium` once.
+## Підготовка ведучого
 
-## Presenting
+Перевір Claude Code і Python на ноутбуці ведучого, відкрий Jira Workflow і прив’яжи Slack до потрібного профілю. Збережи приклади повідомлень до й після змін, а також приклад погодженого запису в Jira. Відкрий поряд файли агента й skill. [Чекліст інтеграції](../docs/specs/jira-slack-workshop-integration-checklist.md)
 
-| Key | Action |
-|---|---|
-| `→` / `space` | next click or slide |
-| `←` | previous click or slide |
-| `↓` / `↑` | next / previous slide, skipping click steps |
-| `f` | fullscreen |
-| `o` | slide overview |
-| `g` | go to slide |
-| `d` | toggle dark mode (the deck is dark-only) |
+З кореня репозиторію виконай команду й збережи результат:
 
-- **Presenter mode** (notes, timer, next slide): open `http://localhost:3030/presenter`
-  or use the presenter icon in the bottom-left toolbar. Speaker notes are in Ukrainian.
-- Every animated diagram is driven by clicks — nothing autoplays except two ambient loops
-  (title background, finale orbit). `prefers-reduced-motion` disables animation.
-- **Slide 10 (architecture)**: besides click steps, any node can be clicked with the mouse
-  to show its repository path and responsibility — useful for Q&A.
-- **Slide 13 (demo scenario)**: clicks step A → B → C; tabs are clickable as well.
-  The scenario tagged "live demo" is set with `live="C"` in `slides.md`.
-- **Slide 14** is the bridge to the real dashboard (`localhost:8000`). The demo itself is
-  never simulated in the deck.
-
-Live-demo prep (in the main repository): backend running, `gh auth status` OK, `claude`
-logged in, Slack webhook configured, scenario branch prepared with
-`demo/scripts/scenario.py prepare C`.
-
-## Structure
-
-```
-slides.md                 all slides + speaker notes (HTML comments)
-components/               interactive Vue components (one per concept)
-global-top.vue            chapter progress footer
-styles/tokens.css         design tokens (colour, type, radius, motion)
-styles/base.css           canvas, typography, code blocks, shared motion
-styles/slides.css         per-slide compositions
-setup/shiki.ts            code theme
-setup/mermaid.ts          Mermaid theme
-docs/storyboard.md        storyboard, component plan, verified-vs-proposed notes
+```bash
+cd backend
+.venv/bin/python -m app.workshop_exercise --reply incomplete | tee /tmp/workshop-before.txt
 ```
 
-Canvas is 1280×720 (16:9) and scales to 1920×1080 and other sizes.
+Локальна команда генерує уточнення й чернетку. Для запису в навчальну Jira відкрий окремий живий тікет і пройди схвалення в Slack.
 
-## Technical accuracy
+## Порядок показу
 
-Claude Code behaviour shown in the deck was checked against code.claude.com
-(hooks, skills, sub-agents, headless) and `claude --help` v2.1.308. Code on slides 11 and 13 is
-excerpted from this repository's `.claude/` directory; validator findings on slide 18 are the
-real output of `demo/scripts/scenario.py verify all`. The terminal output on slide 12 is
-labelled as illustrative.
+1. **Поясни кейс.** Прочитай короткий опис подвійного бронювання й запитай, якої деталі бракує. У дашборді покажи створення навчального тікета. Scheduler бачить нову задачу, бот відкриває тред, бекенд запускає headless-етап.
+2. **Покажи skill.** Відкрий Tone of Voice й визнач із залом одну зміну, яку видно в готовому повідомленні. Наприклад, «кожне питання в окремому нумерованому рядку». Повтори команду з тим самим `--reply incomplete`, тим самим агентом і моделлю. Зістав форму, факти й наступну дію. [Tone of Voice](../.claude/skills/workshop-tone-of-voice/SKILL.md)
+3. **Покажи сабагента.** Відкрий Investigation. Поясни роль, вхід, дозволені інструменти й вихід. Попроси зал запропонувати, яку відсутню деталь повернути першою. Внеси одну правку в тіло агента й повтори кейс. Збережи формат результату, який читає Triage, і перевір, яке питання з’явилося. [Investigation Agent](../.claude/agents/workshop-investigation.md)
+4. **Пройди схвалення наживо.** Відповідай у Slack на питання бота, прочитай актуальну чернетку і натисни «Схвалити». Зістав Timeline, опис Jira й підтвердження в треді. Перевір, що погоджений блок додався один раз. Якщо є час, відкрий Plan, Diff і Validation, щоб показати окремі кроки виправлення та QA.
+
+**Що працює краще для вправи.** Одна правка за прогін і заздалегідь сформульована умова успіху. Якщо одночасно змінити тікет, модель і skill, важко зрозуміти причину відмінності. У перевірках розрізняй, що виконав агент, що засвідчив hook, що пропустила схема й що справді записав бекенд.
+
+[План слайдів](docs/storyboard.md) · [Довідка про skills](https://code.claude.com/docs/en/skills) · [Довідка про сабагентів](https://code.claude.com/docs/en/sub-agents)

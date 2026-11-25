@@ -76,3 +76,16 @@
 .slidev-layout .cols-code > div:last-child pre.shiki { font-size: 13.5px !important; }
 .cols-hooks > div:last-child svg { max-width: 100% !important; width: 100% !important; height: auto !important; }
 .thesis-line { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px !important; }
+
+.workshop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 26px; }
+.workshop-panel { padding: 20px 24px; }
+.workshop-panel p, .workshop-panel li { color: var(--muted); }
+.workshop-panel .workshop-quote { color: var(--text); font-size: 28px; line-height: 1.35; }
+.workshop-rows { display: grid; gap: 14px; margin-top: 24px; }
+.workshop-rows > div { display: grid; grid-template-columns: 235px 1fr; gap: 18px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.workshop-rows p { color: var(--muted); }
+.workshop-code { max-width: 1000px; margin-top: 18px; }
+.slidev-layout .workshop-code pre.shiki { font-size: 17px !important; line-height: 1.45 !important; }
+.slidev-layout .workshop-caption { color: var(--muted); margin-top: 22px; max-width: 1020px; }
+.slidev-layout .workshop-steps { display: grid; gap: 16px; margin-top: 24px; }
+.slidev-layout .workshop-steps li { margin-left: 0.25em; padding-left: 0.25em; }

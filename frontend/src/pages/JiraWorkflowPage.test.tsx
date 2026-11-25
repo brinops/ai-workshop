@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { api, type JiraRun } from "@/services/api";
 import { renderWithProviders } from "@/test/render";
@@ -56,4 +56,33 @@ it("disables Start while a ready ticket is waiting for its plan", async () => {
 
   expect(await screen.findByRole("button", { name: "Планування…" })).toBeDisabled();
   expect(screen.queryByRole("button", { name: "Взяти в роботу" })).not.toBeInTheDocument();
+});
+
+it("lets a paired reporter load the example, edit it and create a training issue", async () => {
+  const example = { title: "Example booking bug", description_text: "The last seat was confirmed twice." };
+  const custom = { title: "Booking bug in two tabs", description_text: "Both browser tabs confirmed the same seat." };
+  vi.spyOn(api, "jiraRuns").mockResolvedValue([]);
+  vi.spyOn(api, "slackPairing").mockResolvedValue({
+    state: "connected", code: null, slack_user_id: "U1", reporter_id: "reporter-1",
+  });
+  vi.spyOn(api, "trainingIssueTemplate").mockResolvedValue(example);
+  const create = vi.spyOn(api, "createTrainingIssue").mockResolvedValue({
+    ...custom, issue_key: "LAB-6", status: "new",
+  });
+  renderWithProviders(<JiraWorkflowPage />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Create training issue" }));
+  const form = within(screen.getByRole("dialog", { name: "Create training issue" }));
+  expect(form.getByRole("button", { name: "Create issue" })).toBeDisabled();
+  const exampleButton = form.getByRole("button", { name: "Use booking example" });
+  await waitFor(() => expect(exampleButton).toBeEnabled());
+  fireEvent.click(exampleButton);
+  expect(form.getByLabelText("Description")).toHaveValue(example.description_text);
+  fireEvent.change(form.getByLabelText("Title"), { target: { value: custom.title } });
+  fireEvent.change(form.getByLabelText("Description"), { target: { value: custom.description_text } });
+  fireEvent.click(form.getByRole("button", { name: "Create issue" }));
+
+  expect(await screen.findByText(/Created LAB-6/)).toHaveAttribute("role", "status");
+  expect(create).toHaveBeenCalledExactlyOnceWith("reporter-1", custom);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });

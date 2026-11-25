@@ -1,14 +1,14 @@
 <script setup lang="ts">
-// Ambient background for the title slide: the remediation loop drawn as a
+// Ambient background for the title slide: the workshop workflow drawn as a
 // quiet node graph. A single pulse travels the loop; nothing here needs clicks.
 const nodes = [
-  { id: 'pr', x: 140, y: 470, label: 'PR', tone: 'neutral' },
-  { id: 'ci', x: 330, y: 330, label: 'CI ✗', tone: 'fail' },
-  { id: 'hook', x: 470, y: 560, label: 'hook', tone: 'neutral' },
-  { id: 'skill', x: 620, y: 380, label: 'skill', tone: 'violet' },
-  { id: 'agent', x: 800, y: 520, label: 'subagent', tone: 'violet' },
-  { id: 'gate', x: 960, y: 340, label: 'validate', tone: 'indigo' },
-  { id: 'ok', x: 1130, y: 470, label: 'CI ✓', tone: 'ok' },
+  { id: 'pr', x: 140, y: 470, label: 'Jira', tone: 'neutral' },
+  { id: 'ci', x: 330, y: 330, label: 'Slack', tone: 'neutral' },
+  { id: 'hook', x: 470, y: 560, label: 'Triage', tone: 'neutral' },
+  { id: 'skill', x: 620, y: 380, label: 'Skill', tone: 'violet' },
+  { id: 'agent', x: 800, y: 520, label: 'Action', tone: 'violet' },
+  { id: 'gate', x: 960, y: 340, label: 'Схвалення', tone: 'indigo' },
+  { id: 'ok', x: 1130, y: 470, label: 'Jira ✓', tone: 'ok' },
 ]
 const path = 'M140 470 C 220 400, 260 330, 330 330 S 420 560, 470 560 S 560 380, 620 380 S 740 520, 800 520 S 900 340, 960 340 S 1070 470, 1130 470'
 </script>

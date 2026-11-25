@@ -7,7 +7,13 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.integrations.training_jira import JiraIssue, ReporterId, TrainingJira
+from app.integrations.training_jira import (
+    JiraIssue,
+    ReporterId,
+    TrainingIssueContent,
+    TrainingJira,
+    booking_issue_template,
+)
 
 router = APIRouter(prefix="/api/jira/training/issues", tags=["Training Jira"])
 Database = Annotated[Session, Depends(get_db)]
@@ -17,11 +23,12 @@ class CreateTrainingIssue(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reporter_id: ReporterId
+    issue: TrainingIssueContent | None = None
 
 
 @router.post("", status_code=201)
 def create_issue(body: CreateTrainingIssue, db: Database) -> JiraIssue:
-    return TrainingJira(db).create_booking_issue(body.reporter_id)
+    return TrainingJira(db).create_issue(body.reporter_id, body.issue or booking_issue_template())
 
 
 @router.get("")
@@ -32,6 +39,11 @@ def list_new_issues(
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
 ) -> list[JiraIssue]:
     return TrainingJira(db).list_new(reporter_id, after=after, limit=limit)
+
+
+@router.get("/template")
+def get_booking_template() -> TrainingIssueContent:
+    return booking_issue_template()
 
 
 @router.get("/{issue_id}")

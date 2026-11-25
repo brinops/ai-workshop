@@ -65,17 +65,19 @@ class AppendResult(BaseModel):
     description_revision: str | None = None
 
 
-class BookingIssueTemplate(BaseModel):
-    title: str
-    description_text: str
+class TrainingIssueContent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+    description_text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=3000)]
 
 
 class BookingScenario(BaseModel):
-    issue: BookingIssueTemplate
+    issue: TrainingIssueContent
 
 
 @lru_cache(maxsize=1)
-def _booking_template() -> BookingIssueTemplate:
+def booking_issue_template() -> TrainingIssueContent:
     path = REPO_ROOT / "demo" / "booking" / "scenario.json"
     return BookingScenario.model_validate_json(path.read_text(encoding="utf-8")).issue
 
@@ -108,9 +110,11 @@ class TrainingJira:
         )
 
     def create_booking_issue(self, reporter_id: ReporterId) -> JiraIssue:
+        return self.create_issue(reporter_id, booking_issue_template())
+
+    def create_issue(self, reporter_id: ReporterId, content: TrainingIssueContent) -> JiraIssue:
         source = self.source()
-        template = _booking_template()
-        row = TrainingIssue(reporter_id=reporter_id, title=template.title, description=template.description_text)
+        row = TrainingIssue(reporter_id=reporter_id, title=content.title, description=content.description_text)
         self.db.add(row)
         self.db.flush()
         return self._issue(source, row)

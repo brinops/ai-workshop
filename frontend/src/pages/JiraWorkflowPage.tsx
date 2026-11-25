@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { BoardColumn } from "@/components/board/BoardColumn";
 import { JiraRunAction } from "@/components/task/JiraRunAction";
@@ -14,8 +16,81 @@ import { api, type JiraRun } from "@/services/api";
 const REFRESH_MS = 3_000;
 const runsKey = ["jira-workflow", "runs"] as const;
 
-function WorkshopSetup() {
+function CreateTrainingIssue({ reporterId }: { reporterId: string }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const client = useQueryClient();
+  const template = useQuery({
+    queryKey: ["jira-workflow", "training-issue-template"],
+    queryFn: api.trainingIssueTemplate,
+    enabled: open,
+  });
+  const create = useMutation({
+    mutationFn: () => api.createTrainingIssue(reporterId, { title: title.trim(), description_text: description.trim() }),
+    onSuccess: () => {
+      setOpen(false);
+      void client.invalidateQueries({ queryKey: runsKey });
+    },
+  });
+  const fieldClass = "w-full rounded-md border border-line bg-bg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+
+  return (
+    <>
+      <Dialog.Root open={open} onOpenChange={(next) => {
+        if (!create.isPending) setOpen(next);
+      }}>
+        <Dialog.Trigger asChild>
+          <Button onClick={() => create.reset()}>Create training issue</Button>
+        </Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/60" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[61] max-h-[90dvh] w-[min(560px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line-strong bg-panel p-5 shadow-2xl">
+            <Dialog.Title className="text-base font-semibold">Create training issue</Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-muted">
+              Use a booking report to try different descriptions and compare the agent’s questions in Slack.
+            </Dialog.Description>
+            <form className="mt-4 space-y-4" onSubmit={(event) => {
+              event.preventDefault();
+              if (!create.isPending && title.trim() && description.trim()) create.mutate();
+            }}>
+              <div className="space-y-1">
+                <label htmlFor="training-issue-title" className="text-sm font-medium">Title</label>
+                <input id="training-issue-title" className={fieldClass} value={title} required maxLength={160}
+                  onChange={(event) => setTitle(event.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="training-issue-description" className="text-sm font-medium">Description</label>
+                <textarea id="training-issue-description" className={fieldClass} value={description} required rows={5} maxLength={3000}
+                  onChange={(event) => setDescription(event.target.value)} />
+              </div>
+              {create.error && <p role="alert" className="text-sm text-bad">{create.error.message}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="ghost" disabled={!template.data || create.isPending} onClick={() => {
+                  if (template.data) {
+                    setTitle(template.data.title);
+                    setDescription(template.data.description_text);
+                  }
+                }}>Use booking example</Button>
+                <div className="ml-auto flex gap-2">
+                  <Dialog.Close asChild><Button type="button" variant="ghost" disabled={create.isPending}>Cancel</Button></Dialog.Close>
+                  <Button type="submit" variant="primary" disabled={create.isPending || !title.trim() || !description.trim()}>
+                    {create.isPending ? "Creating…" : "Create issue"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      {create.data && (
+        <p role="status" className="text-sm text-muted">Created {create.data.issue_key}. Its run appears here after the scheduler picks it up.</p>
+      )}
+    </>
+  );
+}
+
+function WorkshopSetup() {
   const pairing = useQuery({
     queryKey: ["jira-workflow", "pairing"], queryFn: api.slackPairing,
     refetchInterval: (query) => query.state.data?.state === "pending" ? REFRESH_MS : false,
@@ -24,14 +99,10 @@ function WorkshopSetup() {
     mutationFn: api.startSlackPairing,
     onSuccess: () => void pairing.refetch(),
   });
-  const create = useMutation({
-    mutationFn: api.createTrainingIssue,
-    onSuccess: () => void client.invalidateQueries({ queryKey: runsKey }),
-  });
   const reporterId = pairing.data?.reporter_id;
   const pairingState = pairing.data?.state;
   const code = start.data?.code;
-  const error = start.error ?? create.error ?? pairing.error;
+  const error = start.error ?? pairing.error;
 
   return (
     <section aria-labelledby="workshop-setup" className="flex shrink-0 flex-wrap items-center gap-3 rounded-lg border border-line bg-panel px-3 py-2">
@@ -40,7 +111,7 @@ function WorkshopSetup() {
       {reporterId ? (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-ok">Slack connected · {pairing.data?.slack_user_id}</p>
-          <Button onClick={() => create.mutate(reporterId)} disabled={create.isPending}>Create training issue</Button>
+          <CreateTrainingIssue reporterId={reporterId} />
         </div>
       ) : pairing.data && (
         <div className="space-y-2">
@@ -50,9 +121,6 @@ function WorkshopSetup() {
           {pairingState === "expired" && <p className="text-sm text-muted">The code expired. Generate a new one to connect.</p>}
           <Button onClick={() => start.mutate()} disabled={start.isPending}>Generate Slack pairing code</Button>
         </div>
-      )}
-      {create.data && (
-        <p role="status" className="text-sm text-muted">Created {create.data.issue_key}. Its run appears here after the scheduler picks it up.</p>
       )}
       {error && <p role="alert" className="text-sm text-bad">{error.message}</p>}
     </section>

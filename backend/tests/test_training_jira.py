@@ -34,16 +34,23 @@ def _append(command: AppendDescription):
 def test_training_routes_create_read_and_filter_by_reporter_and_status():
     scenario = json.loads((REPO_ROOT / "demo" / "booking" / "scenario.json").read_text())
     with TestClient(create_app()) as client:
+        assert client.get(f"{ROUTE}/template").json() == scenario["issue"]
         first_response = client.post(ROUTE, json={"reporter_id": "reporter-01"})
         assert first_response.status_code == 201
         first = first_response.json()
         second = client.post(ROUTE, json={"reporter_id": "reporter-02"}).json()
-        third = client.post(ROUTE, json={"reporter_id": "reporter-01"}).json()
+        custom = {"title": "Two tabs confirmed the last seat", "description_text": "Both tabs show a confirmation."}
+        third_response = client.post(ROUTE, json={"reporter_id": "reporter-01", "issue": custom})
+        assert third_response.status_code == 201
+        third = third_response.json()
         assert first["schema_version"] == 1 and first["source"]["kind"] == "training"
         assert first["source"] == second["source"] == third["source"]
         assert first["title"] == scenario["issue"]["title"]
         assert first["description_text"] == scenario["issue"]["description_text"]
         assert first["status"] == "new"
+        assert third["title"] == custom["title"]
+        assert third["description_text"] == custom["description_text"]
+        assert third["status"] == "new"
         assert client.get(ROUTE, params={"reporter_id": "reporter-01", "limit": 1}).json() == [first]
         assert client.get(ROUTE, params={"reporter_id": "reporter-01", "after": first["issue_id"]}).json() == [third]
         assert client.get(ROUTE, params={"reporter_id": "reporter-02"}).json() == [second]
@@ -52,6 +59,7 @@ def test_training_routes_create_read_and_filter_by_reporter_and_status():
         assert client.get(detail, params={"reporter_id": "reporter-02"}).status_code == 404
         assert client.patch(detail, json={"append_text": "unapproved"}).status_code == 405
         assert client.post(ROUTE, json={"reporter_id": " "}).status_code == 422
+        assert client.post(ROUTE, json={"reporter_id": "reporter-01", "issue": {**custom, "title": " "}}).status_code == 422
 
         with session_scope() as db:
             db.get(TrainingIssue, int(third["issue_id"])).status = "done"

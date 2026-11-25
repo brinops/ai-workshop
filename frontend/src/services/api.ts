@@ -363,11 +363,14 @@ export interface JiraTimelineEntry {
   status: string | null;
 }
 
-interface TrainingIssue {
-  issue_key: string;
+export interface TrainingIssueContent {
   title: string;
-  status: string;
   description_text: string;
+}
+
+interface TrainingIssue extends TrainingIssueContent {
+  issue_key: string;
+  status: string;
 }
 
 interface JiraRunDetail {
@@ -404,8 +407,9 @@ export const api = {
     request<JiraRun>(`/api/jira/workshop/runs/${encodeURIComponent(id)}/actions/${action}`, { method: "POST" }),
   slackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing"),
   startSlackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing", { method: "POST" }),
-  createTrainingIssue: (reporterId: string) => request<TrainingIssue>("/api/jira/training/issues", {
-    method: "POST", body: JSON.stringify({ reporter_id: reporterId }),
+  trainingIssueTemplate: () => request<TrainingIssueContent>("/api/jira/training/issues/template"),
+  createTrainingIssue: (reporterId: string, issue: TrainingIssueContent) => request<TrainingIssue>("/api/jira/training/issues", {
+    method: "POST", body: JSON.stringify({ reporter_id: reporterId, issue }),
   }),
   board: () => request<Board>("/api/board"),
   task: (id: number) => request<TaskDetail>(`/api/tasks/${id}`),
