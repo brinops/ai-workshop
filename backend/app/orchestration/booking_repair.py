@@ -30,6 +30,7 @@ from app.models.jira_workflow import (
     JiraWorkflowState,
 )
 from app.orchestration.workshop_blockers import queue_blocker
+from app.orchestration.workshop_trace import WorkshopTrace
 from app.services.redaction import redact
 
 KIND = "booking_repair"
@@ -147,7 +148,7 @@ async def _verify(workspace: Path, *args: str) -> tuple[int, str]:
 
 
 async def _run_workshop_agent(name, payload, schema, workspace, run_agent, cancel, timeout,
-                              *, page_review=False, emit=None):
+                              *, page_review=False, emit=None, trace_run_id=None, stage="implementation"):
     agents = workspace / ".claude" / "agents"
     agents.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(REPO_ROOT / ".claude" / "agents" / f"{name}.md", agents / f"{name}.md")
@@ -157,18 +158,30 @@ async def _run_workshop_agent(name, payload, schema, workspace, run_agent, cance
         tools.extend(("Skill", "Read", "Bash"))
         allowed_tools.extend((PAGE_SKILL_PERMISSION, f"Read(./{PAGE_RUNBOOK.as_posix()})",
                               f"Bash({PAGE_REVIEW_COMMAND})"))
+    trace = WorkshopTrace(trace_run_id, stage, name) if trace_run_id else None
     spec = AgentSpec(
         prompt=json.dumps(payload, ensure_ascii=False), agent=name, tools=tools,
         allowed_tools=allowed_tools, json_schema=schema, cwd=workspace, timeout=timeout,
-        output_language="Ukrainian",
+        output_language="Ukrainian", trace=trace,
     )
-    result = await run_agent(spec, emit or (lambda *_: None), cancel, None)
+    if trace:
+        trace.lifecycle("started", status="running")
+    try:
+        result = await run_agent(spec, emit or (lambda *_: None), cancel, None)
+    except (OSError, ValueError, RuntimeError, TimeoutError) as exc:
+        if trace:
+            trace.lifecycle("finished", status="failed", error=redact(str(exc))[:1200])
+        raise
+    if trace:
+        trace.lifecycle("finished", status=result.status, error=redact(result.error)[:1200] or None)
     if result.status != "succeeded":
         raise RuntimeError(result.error or f"{name}: {result.status}")
     return result.structured
 
 
-async def plan_booking(report: str, run_agent, cancel: asyncio.Event, timeout: float) -> BookingPlan:
+async def plan_booking(
+    report: str, run_agent, cancel: asyncio.Event, timeout: float, *, trace_run_id: str | None = None,
+) -> BookingPlan:
     routes = get_config().jira_routes
     if not routes:
         raise RuntimeError("No Jira routes configured")
@@ -180,7 +193,8 @@ async def plan_booking(report: str, run_agent, cancel: asyncio.Event, timeout: f
                 "source": (REPO_ROOT / FIXTURE / "service.py").read_text(encoding="utf-8"),
                 "test": (REPO_ROOT / FIXTURE / "test_booking.py").read_text(encoding="utf-8"),
             },
-        }, RouteSelection.model_json_schema(), Path(directory), run_agent, cancel, timeout)
+        }, RouteSelection.model_json_schema(), Path(directory), run_agent, cancel, timeout,
+            trace_run_id=trace_run_id, stage="planning")
     try:
         plan = RouteSelection.model_validate(output)
     except ValidationError as exc:
@@ -208,7 +222,7 @@ async def plan_booking(report: str, run_agent, cancel: asyncio.Event, timeout: f
     )
 
 
-async def _write_booking_patch(workspace, plan, payload, run_agent, cancel, timeout) -> tuple[str, str]:
+async def _write_booking_patch(workspace, plan, payload, run_agent, cancel, timeout, trace_run_id) -> tuple[str, str]:
     fixture = workspace / FIXTURE
     fixture.mkdir(parents=True)
     source_path = fixture / "service.py"
@@ -222,7 +236,7 @@ async def _write_booking_patch(workspace, plan, payload, run_agent, cancel, time
                 "confirmed/waitlist append, and return statuses. Keep the async eligibility check.",
         "source": source,
         "test": (fixture / "test_booking.py").read_text(encoding="utf-8"),
-    }, SCHEMA, workspace, run_agent, cancel, timeout)
+    }, SCHEMA, workspace, run_agent, cancel, timeout, trace_run_id=trace_run_id)
     if not isinstance(output, dict):
         raise ValueError("Execution agent returned an invalid patch")
     updated = candidate_source(source, output.get("body"))
@@ -232,13 +246,13 @@ async def _write_booking_patch(workspace, plan, payload, run_agent, cancel, time
     return patch, str(output.get("summary", ""))
 
 
-async def _write_page_patch(workspace, plan, payload, run_agent, cancel, timeout) -> tuple[str, str]:
+async def _write_page_patch(workspace, plan, payload, run_agent, cancel, timeout, trace_run_id) -> tuple[str, str]:
     output = await _run_workshop_agent(plan.route.execution_agent, {
         **payload,
         "task": "Create an offline static page. Return the contents of demo/static-page/index.html "
                 "and styles.css. Include a title, main heading, linked local stylesheet and a primary "
                 "in-page link to a section. Use HTML and CSS only, without JavaScript or external assets.",
-    }, StaticPagePatch.model_json_schema(), workspace, run_agent, cancel, timeout)
+    }, StaticPagePatch.model_json_schema(), workspace, run_agent, cancel, timeout, trace_run_id=trace_run_id)
     page = StaticPagePatch.model_validate(output)
     (workspace / PAGE).mkdir(parents=True)
     diff = []
@@ -251,7 +265,10 @@ async def _write_page_patch(workspace, plan, payload, run_agent, cancel, timeout
     return "".join(diff), page.summary
 
 
-async def repair_booking(report: str, plan: BookingPlan, run_agent, cancel: asyncio.Event, timeout: float) -> dict:
+async def repair_booking(
+    report: str, plan: BookingPlan, run_agent, cancel: asyncio.Event, timeout: float,
+    *, trace_run_id: str | None = None,
+) -> dict:
     route = plan.route
     if route is None:
         raise RuntimeError("The plan must have a Jira route")
@@ -261,7 +278,7 @@ async def repair_booking(report: str, plan: BookingPlan, run_agent, cancel: asyn
         payload = {"approved_report": report, "plan": plan.model_dump()}
         write_patch = _write_page_patch if page_review else _write_booking_patch
         try:
-            patch, summary = await write_patch(workspace, plan, payload, run_agent, cancel, timeout)
+            patch, summary = await write_patch(workspace, plan, payload, run_agent, cancel, timeout, trace_run_id)
         except (SyntaxError, ValueError) as exc:
             return {"status": "failed", "error": redact(str(exc))[:1200]}
         if page_review:
@@ -291,7 +308,7 @@ async def repair_booking(report: str, plan: BookingPlan, run_agent, cancel: asyn
             review = await _run_workshop_agent(route.qa_agent, {
                 **payload, "patch": patch, "test_output": result["test_output"],
             }, BookingQA.model_json_schema(), workspace, run_agent, cancel, timeout,
-                page_review=page_review, emit=review_log)
+                page_review=page_review, emit=review_log, trace_run_id=trace_run_id, stage="review")
             qa = BookingQA.model_validate(review)
         except ValidationError:
             result["error"] = "QA agent returned an invalid verdict"
@@ -373,14 +390,19 @@ def claim_repair(timeout: float) -> tuple[str, int, str, BookingPlan | None] | N
 async def execute_repair(
     op_id: str, attempt: int, report: str, plan: BookingPlan | None, run_agent, cancel: asyncio.Event, timeout: float,
 ) -> None:
+    with session_scope() as db:
+        op = db.get(JiraWorkflowOperation, op_id)
+        if op is None or op.status != "running" or op.attempts != attempt:
+            return
+        run_id = op.run_id
     planning = plan is None
     notice = None
     try:
         if plan is None:
-            plan = await plan_booking(report, run_agent, cancel, timeout)
+            plan = await plan_booking(report, run_agent, cancel, timeout, trace_run_id=run_id)
             result = {"status": "pending"}
         else:
-            result = await repair_booking(report, plan, run_agent, cancel, timeout)
+            result = await repair_booking(report, plan, run_agent, cancel, timeout, trace_run_id=run_id)
     except UnsupportedRoute as exc:
         result = {"status": "failed", "error": str(exc)}
         notice = exc.notice

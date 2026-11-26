@@ -18,6 +18,7 @@ import shutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from app.config import REPO_ROOT, get_settings
 from app.services.proc import terminate
@@ -35,6 +36,16 @@ _ENV_ALLOW = {
 
 
 @dataclass
+class AgentTraceEvent:
+    kind: Literal["tool_use", "tool_result", "structured_output"]
+    data: object
+    tool_name: str | None = None
+    tool_use_id: str | None = None
+    parent_tool_use_id: str | None = None
+    is_error: bool = False
+
+
+@dataclass
 class AgentSpec:
     prompt: str
     tools: list[str]
@@ -47,6 +58,7 @@ class AgentSpec:
     system_prompt_append: str | None = None
     cwd: Path | None = None
     output_language: str = "English"
+    trace: Callable[[AgentTraceEvent], None] | None = None
 
 
 @dataclass
@@ -132,8 +144,11 @@ def _summarize_tool_input(name: str, data: dict) -> str:
     return json.dumps(data)[:300]
 
 
-def parse_event(evt: dict, emit: LogFn, state: dict) -> None:
+def parse_event(
+    evt: dict, emit: LogFn, state: dict, trace: Callable[[AgentTraceEvent], None] | None = None,
+) -> None:
     kind = evt.get("type")
+    parent_id = evt.get("parent_tool_use_id")
     if kind == "system" and evt.get("subtype") == "init":
         state["session_id"] = evt.get("session_id")
         state["model"] = evt.get("model")
@@ -144,6 +159,8 @@ def parse_event(evt: dict, emit: LogFn, state: dict) -> None:
                 emit("text", block["text"].strip())
             elif block.get("type") == "tool_use":
                 name = block.get("name", "?")
+                if trace:
+                    trace(AgentTraceEvent("tool_use", block.get("input") or {}, name, block.get("id"), parent_id))
                 detail = json.dumps(block.get("input") or {}, indent=2, ensure_ascii=False)[:DETAIL_LIMIT]
                 if name == "StructuredOutput":
                     emit("tool_use", "StructuredOutput · returning structured result", detail)
@@ -158,10 +175,15 @@ def parse_event(evt: dict, emit: LogFn, state: dict) -> None:
                 full = str(content or "").strip()
                 text = full.replace("\n", " ⏎ ")
                 prefix = "error · " if block.get("is_error") else ""
+                if trace:
+                    trace(AgentTraceEvent("tool_result", full, tool_use_id=block.get("tool_use_id"),
+                                          parent_tool_use_id=parent_id, is_error=bool(block.get("is_error"))))
                 emit("tool_result", prefix + (text[:400] + ("…" if len(text) > 400 else "")),
                      full[:DETAIL_LIMIT] if len(text) > 400 or "\n" in full else None)
     elif kind == "result":
         state["result"] = evt
+        if trace and isinstance(evt.get("structured_output"), dict):
+            trace(AgentTraceEvent("structured_output", evt["structured_output"], is_error=bool(evt.get("is_error"))))
         cost = evt.get("total_cost_usd")
         summary = {k: evt.get(k) for k in ("subtype", "is_error", "num_turns", "duration_ms", "total_cost_usd",
                                            "permission_denials", "structured_output")}
@@ -213,7 +235,7 @@ async def run_agent(
             except json.JSONDecodeError:
                 emit("stderr", line[:500])
                 continue
-            parse_event(evt, emit, state)
+            parse_event(evt, emit, state, spec.trace)
 
     async def read_stderr() -> None:
         async for raw in proc.stderr:

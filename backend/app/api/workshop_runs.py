@@ -38,6 +38,15 @@ class RunSummary(BaseModel):
     title: str | None = None
 
 
+class TimelineTrace(BaseModel):
+    kind: Literal["tool_use", "tool_result", "structured_output"]
+    tool_name: str | None = None
+    tool_use_id: str | None = None
+    detail: str
+    truncated: bool = False
+    is_error: bool = False
+
+
 class TimelineEntry(BaseModel):
     id: int
     event_type: str
@@ -50,6 +59,8 @@ class TimelineEntry(BaseModel):
     hook_status: str | None
     status: str | None
     error: str | None = None
+    attempt_id: str | None = None
+    trace: TimelineTrace | None = None
 
 
 class DraftSummary(BaseModel):
@@ -103,7 +114,7 @@ def get_run(run_id: str, db: Database) -> RunDetail:
     issue = TrainingJira(db).get_issue(run.issue_id, run.source_reporter_id) if run.source_kind == "training" else None
     events = db.scalars(select(JiraWorkflowEvent).where(
         JiraWorkflowEvent.run_id == run_id,
-    ).order_by(JiraWorkflowEvent.id))
+    ).order_by(JiraWorkflowEvent.received_at, JiraWorkflowEvent.id))
     drafts = db.execute(select(JiraWorkflowDraft, JiraWorkflowDecision).outerjoin(
         JiraWorkflowDecision, JiraWorkflowDecision.draft_id == JiraWorkflowDraft.draft_id,
     ).where(JiraWorkflowDraft.run_id == run_id).order_by(JiraWorkflowDraft.version))
@@ -129,6 +140,8 @@ def get_run(run_id: str, db: Database) -> RunDetail:
                 agent_type=event.payload.get("agent_type"), hook_status=event.payload.get("hook_status"),
                 status=event.payload.get("status"),
                 error=event.payload.get("error") or event.payload.get("reason"),
+                attempt_id=event.payload.get("attempt_id"),
+                trace=event.payload.get("trace"),
             )
             for event in events
         ],

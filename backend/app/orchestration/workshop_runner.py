@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from uuid import uuid4
 
 from pydantic import ValidationError
 from sqlalchemy.dialects.sqlite import insert
@@ -18,6 +17,7 @@ from app.config import REPO_ROOT, get_settings
 from app.db import session_scope
 from app.integrations.claude_runner import AgentResult, AgentSpec
 from app.models.jira_workflow import JiraWorkflowEvent, JiraWorkflowRun
+from app.orchestration.workshop_trace import WorkshopTrace
 from app.services.redaction import redact
 
 TRIAGE_AGENT = "workshop-triage"
@@ -55,14 +55,6 @@ def _prepare_workspace(workspace: Path) -> None:
         target = workspace / path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(REPO_ROOT / path, target)
-
-
-def _record(run_id: str, attempt_id: str, stage: str, event: str, **data) -> None:
-    with session_scope() as db:
-        db.add(JiraWorkflowEvent(
-            run_id=run_id, event_id=f"{attempt_id}:{event}", event_type=f"workshop.agent_{event}",
-            payload={"attempt_id": attempt_id, "stage": stage, **data},
-        ))
 
 
 def _import_subagent_events(workspace: Path, run_id: str, attempt_id: str, stage: str) -> str:
@@ -115,8 +107,9 @@ async def run_workshop_stage(run_id: str, request: StageInput, cancel,
     if request.stage == "result" and request.write_result is None:
         raise ValueError("result stage requires the actual write outcome")
 
-    attempt_id = f"workshop-{uuid4().hex}"
-    _record(run_id, attempt_id, request.stage, "started")
+    trace = WorkshopTrace(run_id, request.stage, TRIAGE_AGENT)
+    attempt_id = trace.attempt_id
+    trace.lifecycle("started", status="running")
     delegates: list[str] = []
 
     def emit(kind: str, summary: str, detail: str | None = None) -> None:
@@ -150,6 +143,7 @@ async def run_workshop_stage(run_id: str, request: StageInput, cancel,
                 json_schema=claude_output_schema(contract),
                 agent=TRIAGE_AGENT, cwd=workspace, output_language="Ukrainian",
                 timeout=get_settings().jira_workshop_agent_timeout_seconds,
+                trace=trace,
             )
             try:
                 result = await run_agent(spec, emit, cancel, None)
@@ -169,8 +163,8 @@ async def run_workshop_stage(run_id: str, request: StageInput, cancel,
     except (OSError, ValueError, RuntimeError) as exc:
         status, error = "failed", redact(f"{type(exc).__name__}: {exc}")[:1500]
 
-    _record(
-        run_id, attempt_id, request.stage, "finished",
+    trace.lifecycle(
+        "finished",
         status=status, error=error, retryable=status in ("failed", "timeout"),
         hook_status=hook_status, delegated_agents=delegates, model=result.model if result else None,
         exit_code=result.exit_code if result else None,

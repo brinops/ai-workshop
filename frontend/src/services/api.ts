@@ -362,6 +362,15 @@ export interface JiraTimelineEntry {
   hook_status: string | null;
   status: string | null;
   error?: string | null;
+  attempt_id?: string | null;
+  trace?: {
+    kind: "tool_use" | "tool_result" | "structured_output";
+    tool_name: string | null;
+    tool_use_id: string | null;
+    detail: string;
+    truncated: boolean;
+    is_error: boolean;
+  } | null;
 }
 
 export interface TrainingIssueContent {

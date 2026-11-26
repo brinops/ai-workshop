@@ -5,37 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { absoluteTime, humanize } from "@/lib/format";
-import { api, type JiraTimelineEntry } from "@/services/api";
+import { api } from "@/services/api";
 import { JiraRunAction } from "./JiraRunAction";
-
-const eventLabels: Record<string, string> = {
-  "jira.issue_discovered": "Jira issue discovered",
-  "jira.description_appended": "Jira description updated",
-  "slack.thread_opened": "Slack thread opened",
-  "slack.thread_reply": "Reporter replied in Slack",
-  "slack.reply_posted": "Bot replied in Slack",
-  "slack.confirmation_posted": "Confirmation posted in Slack",
-  "workshop.agent_started": "Agent started",
-  "workshop.agent_finished": "Agent finished",
-  "workshop.subagent_started": "Subagent started",
-  "workshop.subagent_finished": "Subagent finished",
-  "workshop.handoff_start": "Booking repair queued",
-  "workshop.booking_plan_result": "Implementation plan",
-  "workshop.booking_tests_result": "Automated checks",
-  "workshop.booking_qa_result": "QA review",
-  "workshop.booking_repair_result": "Implementation result",
-  "workshop.blocker": "Workflow blocked",
-  "workshop.handoff_finish": "Agent work marked complete",
-};
-
-function eventLabel(entry: JiraTimelineEntry) {
-  if (entry.event_type === "slack.draft_action") {
-    const draft = entry.draft_version === null ? "draft" : `draft v${entry.draft_version}`;
-    if (entry.outcome !== "accepted") return `Slack ${humanize(entry.action).toLowerCase()} click for ${draft}`;
-    return entry.action === "approve" ? `Reporter approved ${draft}` : `Reporter requested changes to ${draft}`;
-  }
-  return eventLabels[entry.event_type] ?? entry.event_type;
-}
+import { JiraRunTimeline } from "./JiraRunTimeline";
 
 function JiraRunDetail({ runId }: { runId: string }) {
   const { data, error } = useQuery({
@@ -104,23 +76,7 @@ function JiraRunDetail({ runId }: { runId: string }) {
             )}
           </TabsContent>
           <TabsContent value="timeline">
-            {timeline.length === 0 && <p className="text-sm text-muted">No events yet.</p>}
-            <ol className="divide-y divide-line">
-              {timeline.map((event) => (
-                <li key={event.id} className="flex flex-wrap justify-between gap-x-3 gap-y-1 py-2 text-sm">
-                  <span>
-                    {eventLabel(event)}
-                    {event.agent_type && <span className="font-mono"> · {event.agent_type}</span>}
-                    {[event.status, event.hook_status !== "recorded" && event.hook_status, event.stage,
-                      event.outcome !== "accepted" && event.outcome].filter(Boolean).map((value, index) => (
-                      <span key={index} className="text-muted"> · {humanize(value || null)}</span>
-                    ))}
-                  </span>
-                  <time dateTime={event.received_at} className="text-xs text-muted">{absoluteTime(event.received_at)}</time>
-                  {event.error && <p className="w-full break-words text-xs text-bad">{event.error}</p>}
-                </li>
-              ))}
-            </ol>
+            <JiraRunTimeline key={runId} timeline={timeline} />
           </TabsContent>
           <TabsContent value="drafts">
             {drafts.length === 0 && <p className="text-sm text-muted">No drafts yet.</p>}

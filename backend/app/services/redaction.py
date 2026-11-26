@@ -10,10 +10,12 @@ _PATTERNS = [
     re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
     re.compile(r"sk-ant-[A-Za-z0-9\-_]{20,}"),
     re.compile(r"xox[abposr]-[A-Za-z0-9-]{10,}"),
+    re.compile(r"xapp-[A-Za-z0-9-]{10,}"),
     re.compile(r"https://hooks\.slack\.com/services/[A-Za-z0-9/]+"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"(?i)(authorization:\s*(?:bearer|token)\s+)[^\s'\"]+"),
+    re.compile(r"""(?i)((?:[a-z0-9_-]+[_-])?(?:api[_-]?key|token|secret|password|passwd|authorization)['"]\s*:\s*['"])[^'"\r\n]+"""),
     re.compile(r"(?i)\b((?:api[_-]?key|token|secret|password|passwd)\s*[=:]\s*)['\"]?[^\s'\"]{6,}"),
 ]
 

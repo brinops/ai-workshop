@@ -3,6 +3,7 @@ import { expect, it, vi } from "vitest";
 import { api, type JiraRun } from "@/services/api";
 import { renderWithProviders } from "@/test/render";
 import { JiraWorkflowPage } from "./JiraWorkflowPage";
+import { JiraRunTimeline } from "@/components/task/JiraRunTimeline";
 
 vi.mock("@/components/layout/TopBar", () => ({ TopBar: () => null }));
 
@@ -56,6 +57,48 @@ it("disables Start while a ready ticket is waiting for its plan", async () => {
 
   expect(await screen.findByRole("button", { name: "Планування…" })).toBeDisabled();
   expect(screen.queryByRole("button", { name: "Взяти в роботу" })).not.toBeInTheDocument();
+});
+
+it("expands tool input, the matching result and final JSON in Agent activity", () => {
+  const base = {
+    received_at: "2026-11-26T09:00:00Z", outcome: null, action: null, draft_version: null,
+    stage: "review", agent_type: "workshop-reviewer", hook_status: null, status: null,
+    attempt_id: "attempt-1",
+  };
+  const trace = { tool_name: "Read", tool_use_id: "tool-1", truncated: false, is_error: false };
+  renderWithProviders(<JiraRunTimeline timeline={[
+    { ...base, id: 1, event_type: "slack.thread_opened" },
+    { ...base, id: 2, event_type: "workshop.agent_tool_use",
+      trace: { ...trace, kind: "tool_use", detail: '{"file_path":"runbooks/static-page.md"}' } },
+    { ...base, id: 3, event_type: "workshop.agent_tool_result",
+      trace: { ...trace, kind: "tool_result", detail: "Page review runbook" } },
+    { ...base, id: 4, event_type: "workshop.agent_structured_output",
+      trace: { ...trace, tool_name: null, tool_use_id: null, kind: "structured_output", detail: '{"verdict":"approved"}' } },
+  ]} />);
+  expect(screen.getByText("Slack thread opened")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Agent activity" }));
+  expect(screen.queryByText("Slack thread opened")).not.toBeInTheDocument();
+  const read = screen.getByText("Read");
+  fireEvent.click(read);
+  const tool = read.closest("details")!;
+  expect(tool).toHaveAttribute("open");
+  expect(tool).toHaveTextContent('{"file_path":"runbooks/static-page.md"}');
+  expect(tool).toHaveTextContent("Page review runbook");
+  const output = screen.getByText("Structured output");
+  fireEvent.click(output);
+  expect(output.closest("details")).toHaveAttribute("open");
+  expect(output.closest("details")).toHaveTextContent('{"verdict":"approved"}');
+});
+
+it("explains why an older run has no detailed tool logs", () => {
+  renderWithProviders(<JiraRunTimeline timeline={[{
+    id: 1, event_type: "workshop.agent_finished", received_at: "2026-11-26T09:00:00Z",
+    outcome: null, action: null, draft_version: null, stage: "triage", agent_type: "workshop-triage",
+    hook_status: "recorded", status: "succeeded",
+  }]} />);
+  fireEvent.click(screen.getByRole("button", { name: "Agent activity" }));
+  expect(screen.getByText(/No tool details have been recorded/)).toBeInTheDocument();
+  expect(screen.getByText("Agent finished", { exact: false })).toBeInTheDocument();
 });
 
 it("shows the blocker on the ticket and in Timeline with a link back to Slack", async () => {

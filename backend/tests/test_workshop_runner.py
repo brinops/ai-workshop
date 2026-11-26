@@ -7,11 +7,11 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.agents.workshop import StageInput
-from app.api.workshop_runs import change_handoff_state
+from app.api.workshop_runs import change_handoff_state, get_run
 from app.config import REPO_ROOT, get_settings
 from app.control_plane import get_config
 from app.db import session_scope
-from app.integrations.claude_runner import AgentResult
+from app.integrations.claude_runner import AgentResult, AgentTraceEvent
 from app.integrations.training_jira import TrainingJira
 from app.models.jira_workflow import JiraWorkflowEvent, JiraWorkflowOperation, JiraWorkflowProfile, JiraWorkflowRun
 from app.orchestration.booking_repair import KIND, claim_repair, execute_repair
@@ -84,8 +84,14 @@ assert request['run_id'] == 'run-workshop'
 assert request['stage'] == 'triage'
 for role in ('workshop-investigation', 'workshop-communication'):
     print(json.dumps({'type':'assistant','message':{'content':[
-        {'type':'tool_use','name':'Agent','input':{'subagent_type':role,'prompt':'private prompt'}}
+        {'type':'tool_use','id':role,'name':'Agent','input':{'subagent_type':role,'prompt':'private prompt'}}
     ]}}))
+print(json.dumps({'type':'assistant','parent_tool_use_id':'workshop-investigation','message':{'content':[
+    {'type':'tool_use','id':'read-1','name':'Read','input':{'file_path':'demo/booking/service.py'}}
+]}}))
+print(json.dumps({'type':'user','parent_tool_use_id':'workshop-investigation','message':{'content':[
+    {'type':'tool_result','tool_use_id':'read-1','content':'{"password":"fixture-secret","status":"read"}'}
+]}}))
 for agent_id, kind in (('agent-1', 'SubagentStart'), ('agent-1', 'SubagentStart'),
                        ('agent-1', 'SubagentStop'), ('agent-2', 'SubagentStart')):
     subprocess.run([sys.executable, '.claude/hooks/record_subagent.py'], check=True,
@@ -107,12 +113,21 @@ print(json.dumps({'type':'result','structured_output':{
         lifecycle = db.scalars(select(JiraWorkflowEvent).where(
             JiraWorkflowEvent.event_type.in_(("workshop.subagent_started", "workshop.subagent_finished")),
         ).order_by(JiraWorkflowEvent.id)).all()
+        traces = [event for event in get_run(RUN_ID, db).timeline if event.trace]
     assert [(event.payload["agent_id"], event.event_type) for event in lifecycle] == [
         ("agent-1", "workshop.subagent_started"), ("agent-1", "workshop.subagent_finished"),
         ("agent-2", "workshop.subagent_started"),
     ]
     assert all(event.payload["attempt_id"] == attempt.attempt_id for event in lifecycle)
     assert all("private report" not in str(event.payload) for event in lifecycle)
+    assert all("private prompt" not in event.trace.detail for event in traces)
+    call, response = [event for event in traces if event.trace.tool_use_id == "read-1"]
+    assert call.trace.tool_name == response.trace.tool_name == "Read"
+    assert call.agent_type == response.agent_type == "workshop-investigation"
+    assert json.loads(call.trace.detail)["file_path"] == "demo/booking/service.py"
+    assert json.loads(response.trace.detail) == {"password": "[REDACTED]", "status": "read"}
+    assert traces[-1].trace.kind == "structured_output"
+    assert json.loads(traces[-1].trace.detail)["kind"] == "ask_questions"
 
 
 
@@ -195,6 +210,8 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeyp
     async def agent(spec, *_):
         calls.append(spec.agent)
         payload = json.loads(spec.prompt)
+        assert spec.trace
+        spec.trace(AgentTraceEvent("tool_use", {"status": "sample"}, "StructuredOutput", "demo-tool"))
         if spec.agent == "workshop-planning":
             assert "plan" not in payload
             assert set(payload["routes"]) == {"booking-backend", "static-page"}
@@ -220,4 +237,9 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeyp
     with session_scope() as db:
         op = db.get(JiraWorkflowOperation, op_id)
         assert op.status == "failed" and op.result["plan"] == routed_plan
+        traces = [entry for entry in get_run(RUN_ID, db).timeline if entry.trace]
+        assert [(entry.stage, entry.agent_type) for entry in traces] == [
+            ("planning", "workshop-planning"), ("implementation", "workshop-developer"),
+        ]
+        assert traces[0].attempt_id != traces[1].attempt_id
     assert calls == ["workshop-planning", "workshop-developer"]
