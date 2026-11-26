@@ -1,6 +1,8 @@
 # CI Control Plane
 
-A working, end-to-end demonstration of autonomous remediation of broken Kubernetes / Helm configuration:
+This workshop repository includes two workflows in one dashboard. **CI Dashboard** demonstrates remediation of
+Kubernetes and Helm failures in a GitHub PR. [**Jira Workflow**](#jira-workflow) takes a training ticket through
+Slack clarification, reporter approval, planning, implementation and review.
 
 **Detection → Reasoning → Autonomous Repair → Deterministic Validation → Human Visibility**
 
@@ -17,7 +19,7 @@ visible live on a Kanban dashboard.
 - Troubleshooting: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 - Implementation plan & decisions: [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
 
-## Architecture
+## CI architecture
 
 ```mermaid
 flowchart LR
@@ -60,6 +62,38 @@ stateDiagram-v2
 Kanban columns: **NEW** (NEW, WAITING_CI, ANALYZING) · **TODO** (TODO, NEEDS_REVIEW) ·
 **IN PROGRESS** (IN_PROGRESS, VALIDATING) · **DONE** (DONE, FAILED). Cancel moves any active task to FAILED.
 
+## Jira Workflow
+
+Open **Jira Workflow** at `/jira-workflow`. The workshop uses Training Jira by default. The scheduler picks up
+the paired reporter's `New` tickets, and the Slack bot opens one thread per ticket. The reporter approves a
+specific draft before the backend appends it to the ticket description. The issue stays `New` in Training Jira.
+
+```mermaid
+flowchart TD
+    Ticket["Training Jira ticket"] --> Scheduler["Scheduler opens a run and a Slack thread"]
+    Scheduler --> Triage["Triage delegates to specialists"]
+    Triage -->|Missing details| Reply["Reporter replies in the same thread"]
+    Reply --> Triage
+    Triage -->|Draft ready| Approval["Reporter approves the current version"]
+    Approval --> Apply["Backend appends the approved block and confirms in Slack"]
+    Apply --> Plan["Planner selects a route and saves a plan"]
+    Plan --> Start["Operator selects «Взяти в роботу»"]
+    Start --> Build["Developer proposes changes"]
+    Build --> Verify["Backend checks, then Reviewer"]
+    Verify --> Finish["Operator accepts the result and finishes the run"]
+```
+
+The Jira Kanban shows **New → Clarification → Ready for handoff → In progress → Done**. Open a card to see the
+Slack thread, draft versions, plan, diff and validation. **Timeline → Agent activity** shows delegation, tool
+inputs and results, and structured JSON for runs that captured those details.
+
+| Start here | What it covers |
+|---|---|
+| [Jira Workflow architecture and run guide](docs/JIRA_WORKFLOW.md) | Sequence and state diagrams, agent roles, routing, dashboard and troubleshooting |
+| [Slack setup](docs/specs/jira-slack-workshop-integration-checklist.md) | Local Socket Mode, pairing and the optional shared router |
+| [Workshop presentation and facilitator notes](presentation/README.md) | Slides, two live exercises and demo preparation |
+| [Agent exercise without Slack or Jira](demo/jira-workshop/README.md#локальна-вправа-без-slack-і-jira) | Reproduce the same input while editing a skill or an agent profile |
+
 ## Repository layout
 
 ```text
@@ -69,13 +103,16 @@ backend/                FastAPI app, worker, SQLAlchemy models, Alembic migratio
   app/agents/           analysis & remediation contracts (schemas, prompts, reconciliation, scope)
   app/integrations/     GitHub REST, git worktrees, headless Claude runner, Slack
 frontend/               React + TypeScript + Vite + Tailwind dashboard
-control-plane.yaml      repositories and routes: failed check → skill, agent, validator, allowed paths
+control-plane.yaml      CI repository routes and Jira implementation/review routes
 demo/charts/            payments-api Helm chart
 demo/scenarios/         scenario definitions A/B/C
 demo/scripts/           scenario.py (prepare/verify), agent_dry_run.py (rehearsal)
+demo/booking/           Python booking service, test and training ticket data
+demo/static-page/       static HTML/CSS training ticket data
+presentation/           browser-based workshop slides and facilitator notes
 .claude/hooks/          register_pr.py — PostToolUse hook
-.claude/skills/         k8s-failure-analysis — Analysis Skill (+ scripts/validate.py, the validator)
-.claude/agents/         k8s-remediator — Remediation Subagent
+.claude/skills/         CI analysis and Jira workshop skills, runbooks and scripts
+.claude/agents/         CI remediation and Jira workshop agent profiles
 .github/workflows/      helm-validate (required check), ci (tests)
 scripts/preflight.py    environment & integration preflight
 ```
@@ -87,7 +124,7 @@ Claude Code (`claude`) logged in.
 
 ```bash
 brew install just helm kubeconform gh uv pnpm   # macOS
-cp .env.example .env                          # set SLACK_WEBHOOK_URL
+cp .env.example .env                          # set SLACK_WEBHOOK_URL for CI notifications
 just install                                  # uv sync + pnpm install
 just build-ui                                 # dashboard → frontend/dist
 just dev                                      # API + worker + UI on http://localhost:8000
@@ -96,6 +133,8 @@ just preflight                                # in another terminal
 
 Run `just` to list all recipes. Set `PORT` in `.env` if :8000 is taken (also set `PUBLIC_URL` to match —
 the hook posts there). UI development with hot reload: `just dev` + `just dev-ui` → http://localhost:5173.
+
+For Jira Workflow, configure the workshop bot in `.env` and pair from the dashboard. [Jira demo setup](docs/JIRA_WORKFLOW.md#як-пройти-демо)
 
 ### Docker Compose
 
@@ -107,7 +146,7 @@ docker compose up --build
 The container cannot reach the macOS keychain, so it needs an explicit Claude credential and a GitHub token
 (git pushes over HTTPS with that token).
 
-## Authentication & configuration
+## CI authentication & configuration
 
 | Integration | What is needed | How it is used |
 |---|---|---|

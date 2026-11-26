@@ -1,5 +1,7 @@
 # CI Control Plane — Architecture
 
+For the training-ticket flow, see [Jira Workflow architecture](JIRA_WORKFLOW.md).
+
 ## 1. Goal
 
 Demonstrate **Detection → Reasoning → Autonomous Repair → Deterministic Validation → Human Visibility**

@@ -81,6 +81,8 @@
 .workshop-panel { padding: 20px 24px; }
 .workshop-panel p, .workshop-panel li { color: var(--muted); }
 .workshop-panel .workshop-quote { color: var(--text); font-size: 28px; line-height: 1.35; }
+.workshop-phase { margin-top: 24px; }
+.workshop-phase h2 { font-size: 23px; margin-bottom: 10px; }
 .workshop-rows { display: grid; gap: 14px; margin-top: 24px; }
 .workshop-rows > div { display: grid; grid-template-columns: 235px 1fr; gap: 18px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .workshop-rows p { color: var(--muted); }
