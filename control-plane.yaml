@@ -36,6 +36,14 @@ repositories:
 # Jira Planner selects one of these IDs. The worker saves both agent names with the plan.
 jira_routes:
   booking-backend:
-    description: Python backend race in the workshop's BookingService.reserve fixture.
-    execution_agent: workshop-booking-backend
-    qa_agent: workshop-booking-qa
+    description: Fix double booking by changing only BookingService.reserve. Preserve the async eligibility check and the confirmed and waitlisted statuses.
+    execution_agent: workshop-developer
+    qa_agent: workshop-reviewer
+  static-page:
+    description: >-
+      Create an offline static landing page in demo/static-page/index.html and demo/static-page/styles.css.
+      Use semantic HTML with an in-page primary link, no JavaScript or external assets. The runner cannot
+      browse for sources. Check the page structure and local stylesheet with the bundled script.
+    execution_agent: workshop-developer
+    qa_agent: workshop-reviewer
+    implementation: static-page

@@ -168,7 +168,8 @@ print(json.dumps({'type':'result','structured_output':{
     assert "too_long" in _finished(attempt.attempt_id)["error"]
 
 
-async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeypatch):
+@pytest.mark.parametrize(("route_id", "implementation"), [("booking-backend", "booking"), ("static-page", "static-page")])
+async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeypatch, route_id, implementation):
     monkeypatch.setenv("CONTROL_PLANE_CONFIG", str(REPO_ROOT / "control-plane.yaml"))
     get_settings.cache_clear()
     get_config.cache_clear()
@@ -181,7 +182,8 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeyp
         ))
     plan = {"goal": "Avoid double booking", "steps": ["Recheck capacity"], "acceptance_criteria": ["One confirmation"]}
     routed_plan = {**plan, "route": {
-        "id": "booking-backend", "execution_agent": "workshop-booking-backend", "qa_agent": "workshop-booking-qa",
+        "id": route_id, "execution_agent": "workshop-developer", "qa_agent": "workshop-reviewer",
+        "implementation": implementation,
     }}
     calls = []
 
@@ -190,8 +192,8 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeyp
         payload = json.loads(spec.prompt)
         if spec.agent == "workshop-planning":
             assert "plan" not in payload
-            assert "booking-backend" in payload["routes"]
-            return AgentResult(status="succeeded", structured={**plan, "route": "booking-backend"})
+            assert set(payload["routes"]) == {"booking-backend", "static-page"}
+            return AgentResult(status="succeeded", structured={**plan, "route": route_id})
         assert payload["plan"] == routed_plan
         return AgentResult(status="failed", error="Execution failed")
 
@@ -213,4 +215,4 @@ async def test_booking_plan_is_persisted_before_repair_and_reused(issue, monkeyp
     with session_scope() as db:
         op = db.get(JiraWorkflowOperation, op_id)
         assert op.status == "failed" and op.result["plan"] == routed_plan
-    assert calls == ["workshop-planning", "workshop-booking-backend"]
+    assert calls == ["workshop-planning", "workshop-developer"]

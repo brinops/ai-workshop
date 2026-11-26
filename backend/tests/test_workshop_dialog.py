@@ -3,10 +3,12 @@ import json
 import pytest
 from sqlalchemy import select
 
-from app.config import get_settings
+from app.config import REPO_ROOT, get_settings
+from app.control_plane import get_config
 from app.db import session_scope
 from app.integrations.claude_runner import AgentResult
 from app.integrations.training_jira import AppendDescription, TrainingJira
+from app.integrations.workshop_slack import ThreadReceipt
 from app.models.jira_workflow import (
     JiraWorkflowDecision,
     JiraWorkflowDraft,
@@ -16,6 +18,7 @@ from app.models.jira_workflow import (
     JiraWorkflowRun,
 )
 from app.models.training_jira import TrainingIssueWrite
+from app.orchestration import slack_thread_queue
 from app.orchestration import worker as worker_module
 from app.orchestration.worker import Deps, Worker
 from app.services.slack_inbox import store_draft_action, store_thread_reply
@@ -91,6 +94,27 @@ def _enable(monkeypatch):
     monkeypatch.setenv("WORKSHOP_SLACK_APP_TOKEN", "xapp-test")
     get_settings.cache_clear()
     monkeypatch.setattr(worker_module, "deliver_next_thread", _publish_pending)
+
+
+async def test_complete_ticket_can_get_draft_without_questions(monkeypatch, training_run):
+    _enable(monkeypatch)
+
+    async def agent(spec, *_):
+        assert json.loads(spec.prompt)["stage"] == "triage"
+        return _output("propose_description_append", block={
+            "heading": "Погоджувана сторінка", "steps": ["Відкрити сторінку", "Перейти до розділу очікування"],
+            "actual": "Сторінки ще немає.", "expected": "Локальна сторінка з посиланням.",
+            "evidence": [], "open_questions": [],
+        })
+
+    worker = Worker(Deps(run_agent=agent))
+    await _tick(worker)
+    await _tick(worker)
+    with session_scope() as db:
+        run = db.get(JiraWorkflowRun, RUN)
+        draft = db.scalars(select(JiraWorkflowDraft)).one()
+        assert run.state == "waiting_for_approval" and run.follow_up_rounds_used == 0
+        assert draft.version == 1 and draft.slack_message_ts
 
 
 async def test_dialogue_follows_slack_events_and_publishes_new_draft(monkeypatch, training_run):
@@ -173,7 +197,7 @@ async def test_dialogue_follows_slack_events_and_publishes_new_draft(monkeypatch
         assert issue.status == training_run.status
         assert issue.description_text == training_run.description_text + "\n\n" + drafts[1].rendered_append
         assert db.scalars(select(JiraWorkflowOperation).where(
-            JiraWorkflowOperation.operation_id == f"{RUN}:reply:confirm",
+            JiraWorkflowOperation.operation_id == f"{RUN}:reply:confirm-v2",
         )).one().status == "opened"
     assert calls[-1] == "result" and calls.count("result") == 1
 
@@ -190,6 +214,105 @@ async def test_dialogue_retry_after_worker_restart_has_one_operation(monkeypatch
         assert op.status == "pending" and op.attempts == 1
     await _tick(Worker(Deps(run_agent=fails)))
     with session_scope() as db:
-        op = db.scalars(select(JiraWorkflowOperation)).one()
+        op = db.get(JiraWorkflowOperation, f"{RUN}:agent:triage")
         assert op.status == "failed" and op.attempts == 2
         assert db.get(JiraWorkflowRun, RUN).state == "needs_intervention"
+        notice = db.get(JiraWorkflowOperation, f"{RUN}:agent:blocker-triage")
+        assert notice.status == "pending"
+    await _tick(Worker(Deps(run_agent=fails)))
+    await _tick(Worker(Deps(run_agent=fails)))
+    with session_scope() as db:
+        reply = db.get(JiraWorkflowOperation, f"{RUN}:reply:blocker-triage")
+        assert "Не вдалося продовжити" in reply.payload["text"]
+
+
+async def test_reporter_can_approve_revised_scope_after_planning_blocker(monkeypatch, training_run):
+    _enable(monkeypatch)
+    monkeypatch.setenv("CONTROL_PLANE_CONFIG", str(REPO_ROOT / "control-plane.yaml"))
+    get_settings.cache_clear()
+    get_config.cache_clear()
+    monkeypatch.setattr(worker_module, "deliver_next_thread", slack_thread_queue.deliver_next_thread)
+    monkeypatch.setattr(slack_thread_queue, "local_identity", lambda db: {"instance_id": "local-dialog"})
+    messages = []
+
+    def deliver(_settings, _identity, _operation_id, reply):
+        assert reply.parent_ts == ROOT
+        messages.append(reply)
+        return ThreadReceipt(state="opened", channel_id=CHANNEL, thread_ts=f"1794306000.{len(messages):06d}",
+                             thread_url="https://workshop.slack.com/archives/CWORK/p1794306000000001")
+
+    monkeypatch.setattr(slack_thread_queue, "_open_local_thread", deliver)
+    block = {"heading": "HTML", "steps": ["Створити один HTML-файл"], "actual": "Сторінки ще немає.",
+             "expected": "Один HTML-файл у test-presentation", "evidence": [], "open_questions": []}
+    revised = {**block, "steps": ["Створити HTML і CSS у demo/static-page"], "expected": "Два локальні файли."}
+    plan = {"goal": "Create a page", "steps": ["Write the files"], "acceptance_criteria": ["The files load locally"]}
+    planning = []
+
+    async def agent(spec, *_):
+        request = json.loads(spec.prompt)
+        if spec.agent == "workshop-planning":
+            planning.append(request["approved_report"])
+            if len(planning) == 1:
+                return AgentResult(status="succeeded", structured={
+                    **plan, "route": None, "blocking_reason": "Папка test-presentation недоступна.",
+                    "suggested_route": "static-page",
+                })
+            return AgentResult(status="succeeded", structured={**plan, "route": "static-page"})
+        stage = request["stage"]
+        if stage == "triage":
+            return _output("propose_description_append", block=block)
+        if stage == "result":
+            return _output("report_result")
+        if stage == "blocker":
+            blocker = request["blocker"]
+            assert "test-presentation" in blocker["reason"] and "demo/static-page" in blocker["next_step"]
+            return _output("report_blocker", slack_text=f"Бро... {blocker['reason']} {blocker['next_step']}")
+        assert stage == "recovery"
+        assert request["previous_block"] == block
+        assert request["replies"][-1]["text"] == "Так, погоджуюся на два файли у demo/static-page."
+        return _output("propose_description_append", block=revised)
+
+    worker = Worker(Deps(run_agent=agent))
+
+    async def tick():
+        await _tick(worker)
+        if worker._repair_job:
+            await worker._repair_job
+
+    await tick()
+    await tick()
+    with session_scope() as db:
+        first = db.scalars(select(JiraWorkflowDraft)).one()
+    assert _click(first, "1794306000.010000", "approve")
+    await tick()  # write v1 and compose confirmation
+    await tick()  # publish confirmation and run planning
+    await tick()  # compose blocker
+    await tick()  # publish blocker
+    assert messages[-1].text.startswith("Бро...") and "demo/static-page" in messages[-1].text
+    with session_scope() as db:
+        assert db.get(JiraWorkflowRun, RUN).state == "needs_intervention"
+        failure = db.scalar(select(JiraWorkflowEvent).where(JiraWorkflowEvent.event_type == "workshop.blocker"))
+        assert "test-presentation" in failure.payload["error"]
+    feedback = "Так, погоджуюся на два файли у demo/static-page."
+    assert _reply("EvRecovery", "1794306000.010100", feedback)
+    assert not _reply("EvRecovery", "1794306000.010100", feedback)
+    await tick()
+    await tick()
+    with session_scope() as db:
+        second = db.scalar(select(JiraWorkflowDraft).where(JiraWorkflowDraft.version == 2))
+        assert second.status == "pending_approval" and len(planning) == 1
+        assert len(db.scalars(select(TrainingIssueWrite)).all()) == 1
+    assert _click(second, "1794306000.010200", "approve")
+    await tick()  # write v2, still waiting for confirmation
+    assert len(planning) == 1
+    await tick()  # publish confirmation and plan revised scope
+    with session_scope() as db:
+        op = db.get(JiraWorkflowOperation, f"{RUN}:booking-repair")
+        assert op.status == "planned" and op.result["plan"]["route"]["id"] == "static-page"
+        assert planning == [first.rendered_append, second.rendered_append]
+        assert len(db.scalars(select(TrainingIssueWrite)).all()) == 2
+        issue = TrainingJira(db).get_issue(training_run.issue_id, training_run.reporter_id)
+        assert issue.status == "new"
+    assert [message.reply_key for message in messages if message.reply_key.startswith("confirm")] == [
+        "confirm-v1", "confirm-v2",
+    ]

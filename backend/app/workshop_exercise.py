@@ -42,6 +42,9 @@ async def exercise(reply_kind: str) -> None:
         return attempt.output
 
     triage = await run(StageInput(stage="triage", issue=issue))
+    if isinstance(triage, Proposal):
+        print(f"Чернетка\n{triage.slack_text}\n\n{triage.block.model_dump_json(indent=2)}")
+        return
     print(f"Уточнення\n{triage.slack_text}\n", flush=True)
     reply = fixture["replies"][reply_kind]
     print(f"Репортер\n{reply}\n", flush=True)

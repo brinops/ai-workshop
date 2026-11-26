@@ -95,7 +95,8 @@ async def deliver_next_thread(settings: Settings) -> None:
                 draft = db.get(JiraWorkflowDraft, request.draft.draft_id)
                 assert draft is not None and draft.run_id == run.run_id
                 draft.slack_message_ts = receipt.thread_ts
-            if request.reply_key == CONFIRMATION_REPLY_KEY and run.state == State.APPLIED:
+            if (request.reply_key == CONFIRMATION_REPLY_KEY
+                    or request.reply_key.startswith(f"{CONFIRMATION_REPLY_KEY}-v")) and run.state == State.APPLIED:
                 run.state, run.last_error = State.READY_FOR_HANDOFF, None
                 event_type = "slack.confirmation_posted"
             else:

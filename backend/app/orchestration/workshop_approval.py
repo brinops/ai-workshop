@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents.workshop import StageInput
+from app.agents.workshop import BlockerNotice, StageInput
 from app.db import session_scope, utcnow
 from app.integrations.training_jira import AppendDescription, JiraIssueRef, TrainingJira
 from app.models.jira_workflow import (
@@ -15,6 +15,7 @@ from app.models.jira_workflow import (
     JiraWorkflowRun,
 )
 from app.models.jira_workflow import JiraWorkflowState as State
+from app.orchestration.workshop_blockers import queue_blocker
 from app.services.slack_inbox import RoutedSlackEvent, local_route_matches
 
 CONFIRMATION_REPLY_KEY = "confirm"
@@ -117,16 +118,25 @@ def apply_next_approval() -> None:
         op.result = result.model_dump(mode="json")
         if result.outcome not in ("applied", "already_applied"):
             op.status = result.outcome
-            run.state, run.last_error = State.NEEDS_INTERVENTION, result.reason or result.outcome
+            queue_blocker(db, run, f"write-v{draft.version}", "jira", result.reason or result.outcome, BlockerNotice(
+                reason=f"Погоджену чернетку v{draft.version} не вдалося записати в Jira.",
+                next_step="Напиши в треді, щоб підготувати актуальну чернетку для повторного схвалення.",
+            ))
             return
 
         issue = jira.get_issue(run.issue_id, run.source_reporter_id)
         assert issue is not None
         op.status = "applied"
         run.state = State.APPLIED
+        repair = db.get(JiraWorkflowOperation, f"{run.run_id}:booking-repair")
+        if repair and repair.status == "failed":
+            repair.status = "awaiting_handoff"
+            repair.payload = {"approved_report": draft.rendered_append}
+            repair.result = None
         request = StageInput(stage="result", issue=issue, write_result=result)
         db.add(JiraWorkflowOperation(
-            operation_id=f"{run.run_id}:agent:{CONFIRMATION_REPLY_KEY}", run_id=run.run_id, kind="agent_stage",
+            operation_id=f"{run.run_id}:agent:{CONFIRMATION_REPLY_KEY}-v{draft.version}",
+            run_id=run.run_id, kind="agent_stage",
             payload=request.model_dump(mode="json"),
         ))
         db.add(JiraWorkflowEvent(

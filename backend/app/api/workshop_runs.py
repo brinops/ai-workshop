@@ -49,6 +49,7 @@ class TimelineEntry(BaseModel):
     agent_type: str | None
     hook_status: str | None
     status: str | None
+    error: str | None = None
 
 
 class DraftSummary(BaseModel):
@@ -65,6 +66,7 @@ class RepairResult(BaseModel):
     summary: str | None = None
     patch: str | None = None
     test_output: str | None = None
+    review_script_checked: bool | None = None
     error: str | None = None
 
 
@@ -126,6 +128,7 @@ def get_run(run_id: str, db: Database) -> RunDetail:
                 draft_version=event.payload.get("draft_version"), stage=event.payload.get("stage"),
                 agent_type=event.payload.get("agent_type"), hook_status=event.payload.get("hook_status"),
                 status=event.payload.get("status"),
+                error=event.payload.get("error") or event.payload.get("reason"),
             )
             for event in events
         ],
@@ -141,20 +144,26 @@ def change_handoff_state(run_id: str, action: Literal["start", "finish", "retry-
     state = JiraWorkflowState
     op_id = f"{run_id}:booking-repair"
     repair = db.get(JiraWorkflowOperation, op_id)
+    if (run.state == state.NEEDS_INTERVENTION and action in ("start", "retry-plan")
+            and (not repair or repair.status != "failed" or (repair.result or {}).get("error") != run.last_error)):
+        raise HTTPException(409, "respond to the current blocker before starting")
     if action == "finish":
         if run.state == state.DONE:
             return summarize(run, repair.status if repair else None)
         if run.state != state.IN_PROGRESS or not repair or repair.status != "passed":
-            raise HTTPException(409, "booking tests must pass before finishing")
+            raise HTTPException(409, "verification must pass before finishing")
         run.state = state.DONE
     elif action == "retry-plan":
-        if run.state != state.READY_FOR_HANDOFF or not repair or repair.status != "failed":
+        if (run.state not in (state.READY_FOR_HANDOFF, state.NEEDS_INTERVENTION)
+                or not repair or repair.status != "failed" or (repair.result or {}).get("plan")):
             raise HTTPException(409, "there is no failed plan to retry")
+        run.state, run.last_error = state.READY_FOR_HANDOFF, None
         repair.status, repair.result = "pending", None
         return summarize(run, repair.status)
     else:
-        if run.state not in (state.READY_FOR_HANDOFF, state.IN_PROGRESS) or run.source_kind != "training":
-            raise HTTPException(409, "run is not ready for the training booking repair")
+        if (run.state not in (state.READY_FOR_HANDOFF, state.IN_PROGRESS, state.NEEDS_INTERVENTION)
+                or run.source_kind != "training"):
+            raise HTTPException(409, "run is not ready for implementation")
         if run.state == state.IN_PROGRESS and repair and repair.status == "failed" and not (repair.result or {}).get("plan"):
             # An old run may have started planning under the previous handoff flow.
             run.state = state.READY_FOR_HANDOFF
@@ -168,7 +177,7 @@ def change_handoff_state(run_id: str, action: Literal["start", "finish", "retry-
             raise HTTPException(409, "the implementation plan must be ready before starting")
         repair.status = "pending"
         repair.result = {"status": "pending", "plan": repair.result["plan"]}
-        run.state = state.IN_PROGRESS
+        run.state, run.last_error = state.IN_PROGRESS, None
 
     event_id = f"{run_id}:handoff:{action}"
     if db.scalar(select(JiraWorkflowEvent.id).where(JiraWorkflowEvent.event_id == event_id)) is None:

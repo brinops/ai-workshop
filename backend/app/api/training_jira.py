@@ -1,11 +1,12 @@
 """Local API for creating and reading workshop fixtures."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
+from app.config import REPO_ROOT
 from app.db import get_db
 from app.integrations.training_jira import (
     JiraIssue,
@@ -42,7 +43,11 @@ def list_new_issues(
 
 
 @router.get("/template")
-def get_booking_template() -> TrainingIssueContent:
+def get_issue_template(example: Literal["booking", "static-page"] = "booking") -> TrainingIssueContent:
+    if example == "static-page":
+        return TrainingIssueContent.model_validate_json(
+            (REPO_ROOT / "demo/static-page/scenario.json").read_text(encoding="utf-8"),
+        )
     return booking_issue_template()
 
 

@@ -35,13 +35,19 @@ class Reply(Contract):
     text: Text
 
 
+class BlockerNotice(Contract):
+    reason: Text
+    next_step: Text
+
+
 class StageInput(Contract):
-    stage: Literal["triage", "reply", "request_revision", "revision", "result"]
+    stage: Literal["triage", "reply", "request_revision", "revision", "result", "blocker", "recovery"]
     issue: JiraIssue
     replies: list[Reply] = Field(default_factory=list)
     follow_up_rounds_used: Literal[0, 1] = 0
     previous_block: DescriptionBlock | None = None
     write_result: AppendResult | None = None
+    blocker: BlockerNotice | None = None
 
 
 class StageOutput(Contract):
@@ -72,18 +78,24 @@ class ReportResult(StageOutput):
     kind: Literal["report_result"]
 
 
+class ReportBlocker(StageOutput):
+    kind: Literal["report_blocker"]
+
+
 class RequestFeedback(StageOutput):
     kind: Literal["request_revision"]
 
 
 def output_contract(request: StageInput) -> TypeAdapter:
     if request.stage == "triage":
-        return TypeAdapter(Questions)
+        return TypeAdapter(Questions | Proposal)
     if request.stage == "result":
         return TypeAdapter(ReportResult)
+    if request.stage == "blocker":
+        return TypeAdapter(ReportBlocker)
     if request.stage == "request_revision":
         return TypeAdapter(RequestFeedback)
-    if request.stage == "revision" or request.follow_up_rounds_used:
+    if request.stage in ("revision", "recovery") or request.follow_up_rounds_used:
         return TypeAdapter(Proposal | NeedsIntervention)
     return TypeAdapter(FollowUp | Proposal | NeedsIntervention)
 

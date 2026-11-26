@@ -35,6 +35,8 @@ def test_training_routes_create_read_and_filter_by_reporter_and_status():
     scenario = json.loads((REPO_ROOT / "demo" / "booking" / "scenario.json").read_text())
     with TestClient(create_app()) as client:
         assert client.get(f"{ROUTE}/template").json() == scenario["issue"]
+        page = json.loads((REPO_ROOT / "demo/static-page/scenario.json").read_text())
+        assert client.get(f"{ROUTE}/template", params={"example": "static-page"}).json() == page
         first_response = client.post(ROUTE, json={"reporter_id": "reporter-01"})
         assert first_response.status_code == 201
         first = first_response.json()

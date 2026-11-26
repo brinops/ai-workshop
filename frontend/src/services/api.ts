@@ -361,6 +361,7 @@ export interface JiraTimelineEntry {
   agent_type: string | null;
   hook_status: string | null;
   status: string | null;
+  error?: string | null;
 }
 
 export interface TrainingIssueContent {
@@ -387,6 +388,7 @@ interface JiraRunDetail {
     summary: string | null;
     patch: string | null;
     test_output: string | null;
+    review_script_checked?: boolean | null;
     error: string | null;
   } | null;
   drafts: { version: number; status: string; decision: string | null; decided_at: string | null }[];
@@ -407,7 +409,8 @@ export const api = {
     request<JiraRun>(`/api/jira/workshop/runs/${encodeURIComponent(id)}/actions/${action}`, { method: "POST" }),
   slackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing"),
   startSlackPairing: () => request<SlackPairing>("/api/jira/workshop/pairing", { method: "POST" }),
-  trainingIssueTemplate: () => request<TrainingIssueContent>("/api/jira/training/issues/template"),
+  trainingIssueTemplate: (example: "booking" | "static-page" = "booking") =>
+    request<TrainingIssueContent>(`/api/jira/training/issues/template?example=${example}`),
   createTrainingIssue: (reporterId: string, issue: TrainingIssueContent) => request<TrainingIssue>("/api/jira/training/issues", {
     method: "POST", body: JSON.stringify({ reporter_id: reporterId, issue }),
   }),

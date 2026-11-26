@@ -20,10 +20,11 @@ const eventLabels: Record<string, string> = {
   "workshop.subagent_started": "Subagent started",
   "workshop.subagent_finished": "Subagent finished",
   "workshop.handoff_start": "Booking repair queued",
-  "workshop.booking_plan_result": "Booking repair plan",
-  "workshop.booking_tests_result": "Booking tests",
+  "workshop.booking_plan_result": "Implementation plan",
+  "workshop.booking_tests_result": "Automated checks",
   "workshop.booking_qa_result": "QA review",
-  "workshop.booking_repair_result": "Booking repair verification",
+  "workshop.booking_repair_result": "Implementation result",
+  "workshop.blocker": "Workflow blocked",
   "workshop.handoff_finish": "Agent work marked complete",
 };
 
@@ -65,7 +66,19 @@ function JiraRunDetail({ runId }: { runId: string }) {
             Repair {humanize(run.repair_status).toLowerCase()}
           </Badge>}
         </div>
-        <JiraRunAction run={run} />
+        {(run.last_error || repair?.error) && (
+          <div role="status" className="rounded-md border border-bad/30 bg-bad/5 p-3 text-sm">
+            <p className="break-words font-medium text-bad">{run.last_error || repair?.error}</p>
+            {run.state === "needs_intervention" && run.thread_url && (
+              <a className="mt-1 inline-block underline" href={run.thread_url} target="_blank" rel="noreferrer">
+                Відкрити тред і відповісти на блокер у Slack
+              </a>
+            )}
+          </div>
+        )}
+        <JiraRunAction run={run} hasPlan={
+          run.state !== "needs_intervention" || run.last_error === repair?.error ? Boolean(repair?.plan) : undefined
+        } />
       </header>
       <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
         <TabsList className="shrink-0 px-4" aria-label="Ticket details">
@@ -104,6 +117,7 @@ function JiraRunDetail({ runId }: { runId: string }) {
                     ))}
                   </span>
                   <time dateTime={event.received_at} className="text-xs text-muted">{absoluteTime(event.received_at)}</time>
+                  {event.error && <p className="w-full break-words text-xs text-bad">{event.error}</p>}
                 </li>
               ))}
             </ol>
@@ -159,6 +173,7 @@ function JiraRunDetail({ runId }: { runId: string }) {
               </section>
             )}
             {repair?.error && <p className="text-sm text-bad">{repair.error}</p>}
+            {repair?.review_script_checked && <p className="text-sm">Reviewer ran the page-check skill script.</p>}
             {repair?.test_output ? (
               <pre className="overflow-x-auto rounded-md border border-line bg-sunken p-3 font-mono text-xs">{repair.test_output}</pre>
             ) : !repair?.error && <p className="text-sm text-muted">No test results yet.</p>}

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { usePresentationMode, useTheme } from "@/hooks/usePreferences";
 import { humanize } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { api, type JiraRun } from "@/services/api";
+import { api, type JiraRun, type TrainingIssueContent } from "@/services/api";
 
 const REFRESH_MS = 3_000;
 const runsKey = ["jira-workflow", "runs"] as const;
@@ -21,9 +21,14 @@ function CreateTrainingIssue({ reporterId }: { reporterId: string }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const client = useQueryClient();
-  const template = useQuery({
-    queryKey: ["jira-workflow", "training-issue-template"],
-    queryFn: api.trainingIssueTemplate,
+  const bookingTemplate = useQuery({
+    queryKey: ["jira-workflow", "training-issue-template", "booking"],
+    queryFn: () => api.trainingIssueTemplate("booking"),
+    enabled: open,
+  });
+  const pageTemplate = useQuery({
+    queryKey: ["jira-workflow", "training-issue-template", "static-page"],
+    queryFn: () => api.trainingIssueTemplate("static-page"),
     enabled: open,
   });
   const create = useMutation({
@@ -34,6 +39,12 @@ function CreateTrainingIssue({ reporterId }: { reporterId: string }) {
     },
   });
   const fieldClass = "w-full rounded-md border border-line bg-bg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+  function fillExample(example: TrainingIssueContent | undefined) {
+    if (example) {
+      setTitle(example.title);
+      setDescription(example.description_text);
+    }
+  }
 
   return (
     <>
@@ -48,7 +59,7 @@ function CreateTrainingIssue({ reporterId }: { reporterId: string }) {
           <Dialog.Content className="fixed left-1/2 top-1/2 z-[61] max-h-[90dvh] w-[min(560px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line-strong bg-panel p-5 shadow-2xl">
             <Dialog.Title className="text-base font-semibold">Create training issue</Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted">
-              Use a booking report to try different descriptions and compare the agent’s questions in Slack.
+              Use the booking or static page example, or write your own workshop ticket.
             </Dialog.Description>
             <form className="mt-4 space-y-4" onSubmit={(event) => {
               event.preventDefault();
@@ -66,12 +77,10 @@ function CreateTrainingIssue({ reporterId }: { reporterId: string }) {
               </div>
               {create.error && <p role="alert" className="text-sm text-bad">{create.error.message}</p>}
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="ghost" disabled={!template.data || create.isPending} onClick={() => {
-                  if (template.data) {
-                    setTitle(template.data.title);
-                    setDescription(template.data.description_text);
-                  }
-                }}>Use booking example</Button>
+                <Button type="button" variant="ghost" disabled={!bookingTemplate.data || create.isPending}
+                  onClick={() => fillExample(bookingTemplate.data)}>Use booking example</Button>
+                <Button type="button" variant="ghost" disabled={!pageTemplate.data || create.isPending}
+                  onClick={() => fillExample(pageTemplate.data)}>Use page example</Button>
                 <div className="ml-auto flex gap-2">
                   <Dialog.Close asChild><Button type="button" variant="ghost" disabled={create.isPending}>Cancel</Button></Dialog.Close>
                   <Button type="submit" variant="primary" disabled={create.isPending || !title.trim() || !description.trim()}>

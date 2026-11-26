@@ -3,16 +3,17 @@ import { Check, CirclePlay, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, type JiraRun } from "@/services/api";
 
-export function JiraRunAction({ run, className }: { run: JiraRun; className?: string }) {
+export function JiraRunAction({ run, className, hasPlan }: { run: JiraRun; className?: string; hasPlan?: boolean }) {
   const client = useQueryClient();
   const handoff = useMutation({
     mutationFn: (action: "start" | "finish" | "retry-plan") => api.jiraHandoff(run.run_id, action),
     onSettled: () => void client.invalidateQueries({ queryKey: ["jira-workflow"] }),
   });
 
-  if (run.state !== "ready_for_handoff" && run.state !== "in_progress") return null;
   const status = run.repair_status;
-  const waitingForPlan = run.state === "ready_for_handoff" && status !== "planned";
+  const blocked = run.state === "needs_intervention" && status === "failed" && hasPlan !== undefined;
+  if (run.state !== "ready_for_handoff" && run.state !== "in_progress" && !blocked) return null;
+  const waitingForPlan = (run.state === "ready_for_handoff" && status !== "planned") || (blocked && !hasPlan);
   const retryPlan = waitingForPlan && status === "failed";
   const busy = (waitingForPlan && !retryPlan) || status === "pending" || status === "running";
   const passed = status === "passed";

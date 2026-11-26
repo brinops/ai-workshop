@@ -11,7 +11,7 @@ import fnmatch
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -76,12 +76,14 @@ class Repository(BaseModel):
 
 
 AgentName = Annotated[str, Field(pattern=NAME_RE)]
+JiraImplementation = Literal["booking", "static-page"]
 
 
 class JiraRoute(BaseModel):
     description: str = Field(min_length=1)
     execution_agent: AgentName
     qa_agent: AgentName
+    implementation: JiraImplementation = "booking"
 
 
 class ControlPlaneConfig(BaseModel):
