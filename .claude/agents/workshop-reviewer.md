@@ -1,7 +1,7 @@
 ---
 name: workshop-reviewer
 description: Check changes against the approved ticket, saved plan and actual verification output.
-tools: StructuredOutput, Skill, Bash
+tools: StructuredOutput, Skill, Read, Bash
 skills:
   - workshop-page-review
 ---
@@ -33,7 +33,7 @@ skills:
 ### Static page
 
 - IF: Маршрут має тип `static-page`.
-- THEN: Спочатку виклич `workshop-page-review` через інструмент `Skill`. Виконай точну Bash-команду з інструкцій скіла і врахуй її результат у рев’ю.
+- THEN: Спочатку виклич `workshop-page-review` через інструмент `Skill`. Прочитай вказаний runbook через `Read`, виконай точну Bash-команду з нього і врахуй її результат у рев’ю.
 - EXAMPLES:
   - Якщо перевірка виявила, що сторінка не підключає `styles.css`, вкажи це у висновку.
 

@@ -42,7 +42,7 @@ cd backend
 
 ## Стандарт для агентів і skills
 
-Використовуй `Purpose → Variables → Instructions → Workflow → Runbooks`. У `Variables` описуй значення, які читає модель, або поля й ліміти з контракту. У runbooks описуй умову, дію й приклад через `IF / THEN / EXAMPLES`.
+Використовуй `Purpose → Variables → Instructions → Workflow → Runbooks`. У `Variables` описуй значення, які читає модель, або поля й ліміти з контракту. У розділі `Runbooks` вкажи умову вибору гілки й посилання на її файл у `runbooks/`. У файлі опиши умову, дію й приклад через `IF / THEN / EXAMPLES`. Для headless-запуску runner має скопіювати папку скіла й дозволити читання файлів, на які він посилається.
 
 Для агента вкажи роль, вхідні дані й точний формат відповіді. У YAML на початку файла зберігай налаштування Claude Code, зокрема дозволені інструменти та підключені skills. У skill описуй повторювану процедуру або правила, які агент застосовує у своїй роботі. [Приклад агента](../.claude/agents/workshop-investigation.md) · [Приклад skill](../.claude/skills/workshop-tone-of-voice/SKILL.md)
 

@@ -23,6 +23,7 @@ from app.services.redaction import redact
 TRIAGE_AGENT = "workshop-triage"
 SPECIALISTS = ("workshop-investigation", "workshop-communication", "workshop-action")
 TONE_OF_VOICE = Path("skills/workshop-tone-of-voice")
+TONE_RUNBOOKS = Path(".claude") / TONE_OF_VOICE / "runbooks"
 SUBAGENT_HOOK = Path("hooks/record_subagent.py")
 
 
@@ -144,7 +145,8 @@ async def run_workshop_stage(run_id: str, request: StageInput, cancel,
                 }, ensure_ascii=False),
                 tools=["Agent", "Read", "StructuredOutput"],
                 allowed_tools=[*(f"Agent({role})" for role in SPECIALISTS),
-                               *(f"Read(./{path})" for path in EVIDENCE_PATHS), "StructuredOutput"],
+                               *(f"Read(./{path})" for path in EVIDENCE_PATHS),
+                               f"Read(./{TONE_RUNBOOKS.as_posix()}/*.md)", "StructuredOutput"],
                 json_schema=claude_output_schema(contract),
                 agent=TRIAGE_AGENT, cwd=workspace, output_language="Ukrainian",
                 timeout=get_settings().jira_workshop_agent_timeout_seconds,

@@ -23,7 +23,7 @@ PASS_MARKER: "Static page checks passed."
 ## Workflow
 
 1. Визнач маршрут зі збереженого плану.
-2. Виконай відповідну гілку в `Runbooks`. Зафіксуй результат перевірки для висновку Reviewer.
+2. Обери гілку в `Runbooks`, прочитай її файл через `Read` і виконай інструкції. Шлях у посиланні відраховується від папки скіла `.claude/skills/workshop-page-review/`.
 3. Зістав diff і результати перевірок із погодженими вимогами. Якщо є розбіжність, назви конкретний критерій приймання.
 
 ## Runbooks
@@ -31,17 +31,7 @@ PASS_MARKER: "Static page checks passed."
 ### Static page
 
 - IF: Маршрут у плані дорівнює `PAGE_ROUTE`.
-- THEN: Виконай цю команду через Bash.
-
-```bash
-python3 -I .claude/skills/workshop-page-review/scripts/check_page.py
-```
-
-- IF: Bash відхилив команду через додані аргументи або іншу команду.
-- THEN: Повтори дослівно команду з цього runbook.
-- EXAMPLES:
-  - `Static page checks passed.` і успішний статус Bash підтверджують, що скрипт пройшов. Далі перевір критерії плану за diff.
-  - `Link the local styles.css file.` вказує, що сторінка не підключає локальну таблицю стилів.
+- THEN: Прочитай [Static page](runbooks/static-page.md) і виконай точну команду з файла.
 
 ### Other routes
 

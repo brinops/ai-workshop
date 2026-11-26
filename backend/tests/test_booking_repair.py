@@ -8,8 +8,16 @@ import pytest
 from app.config import REPO_ROOT
 from app.integrations.claude_runner import AgentResult
 from app.orchestration.booking_repair import (
-    FIXTURE, PAGE_CHECK_PASSED, PAGE_REVIEW_COMMAND, PAGE_SCRIPT, PAGE_SKILL_PERMISSION, BookingPlan, SelectedRoute,
-    candidate_source, repair_booking,
+    FIXTURE,
+    PAGE_CHECK_PASSED,
+    PAGE_REVIEW_COMMAND,
+    PAGE_RUNBOOK,
+    PAGE_SCRIPT,
+    PAGE_SKILL_PERMISSION,
+    BookingPlan,
+    SelectedRoute,
+    candidate_source,
+    repair_booking,
 )
 
 FIX = """await self._check_eligibility(user_id)
@@ -77,8 +85,10 @@ async def test_static_page_requires_backend_checks_and_reviewer_skill(mode):
                 "styles_css": "main { max-width: 50rem; }",
                 "summary": "Create a booking page.",
             })
-        assert spec.tools == ["StructuredOutput", "Skill", "Bash"]
-        assert spec.allowed_tools == ["StructuredOutput", PAGE_SKILL_PERMISSION, f"Bash({PAGE_REVIEW_COMMAND})"]
+        assert spec.tools == ["StructuredOutput", "Skill", "Read", "Bash"]
+        assert spec.allowed_tools == ["StructuredOutput", PAGE_SKILL_PERMISSION, f"Read(./{PAGE_RUNBOOK.as_posix()})",
+                                      f"Bash({PAGE_REVIEW_COMMAND})"]
+        assert PAGE_REVIEW_COMMAND in (spec.cwd / PAGE_RUNBOOK).read_text()
         assert (spec.cwd / PAGE_SCRIPT.parent.parent / "SKILL.md").is_file()
         assert PAGE_CHECK_PASSED in json.loads(spec.prompt)["test_output"]
         if mode != "skip_script":

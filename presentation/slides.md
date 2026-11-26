@@ -159,11 +159,11 @@ DEMO_PREFIX: "Бро..."
 ## Instructions
 Пиши українською, на «ти», короткими реченнями.
 ## Workflow
-Обери гілку в Runbooks і застосуй префікс, якщо увімкнено.
+Прочитай вибраний runbook і застосуй увімкнений префікс.
 ## Runbooks
 ### Approval
 - IF: Чернетка готова до перегляду.
-- THEN: Запропонуй «Схвалити» або «Попросити правки».
+- THEN: Прочитай [Approval](runbooks/approval.md).
 - EXAMPLES: «Бро... переглянь чернетку».
 ```
 
@@ -205,20 +205,20 @@ DEMO_PREFIX: "Бро..."
 
 <div class="workshop-rows">
 <div><strong><code>SKILL.md</code></strong><p>Основні правила й один короткий приклад, потрібні на кожному прогоні.</p></div>
-<div><strong><code>examples.md</code></strong><p>Приклади за сценаріями. В основному файлі вкажи, коли відкрити цей файл.</p></div>
+<div><strong><code>runbooks/</code></strong><p>Інструкції й приклади за сценаріями. У SKILL.md вкажи, коли читати кожен файл.</p></div>
 <div><strong><code>scripts/</code></strong><p>Готові перевірки. Укажи команду й коли агенту її запускати.</p></div>
 </div>
 
 <div class="workshop-code">
 
 ```markdown
-Для запиту правок дивись [приклади повідомлень](examples.md).
+Для запиту правок прочитай [Revision](runbooks/revision.md).
 ```
 
 </div>
 
 <!--
-Наш Tone of Voice вміщується в один файл. Відкрий workshop-page-review, де SKILL.md посилається на scripts/check_page.py. Бекенд копіює папку skill у робочу копію HTML-маршруту. Reviewer може викликати цей skill і одну визначену команду. У Validation можна побачити, чи Reviewer справді її виконав.
+У Tone of Voice відкрий SKILL.md і покажи посилання на runbooks/revision.md. У Page Review відкрий runbooks/static-page.md з командою. Бекенд копіює папку skill у робочу копію. Reviewer читає runbook і може виконати одну визначену команду. У Validation можна побачити, чи Reviewer справді її виконав.
 -->
 
 ---

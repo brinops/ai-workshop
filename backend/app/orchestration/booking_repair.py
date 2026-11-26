@@ -37,6 +37,7 @@ FIXTURE = Path("demo/booking")
 PAGE = Path("demo/static-page")
 PAGE_REVIEW_SKILL = Path(".claude/skills/workshop-page-review")
 PAGE_SKILL_PERMISSION = f"Skill({PAGE_REVIEW_SKILL.name})"
+PAGE_RUNBOOK = PAGE_REVIEW_SKILL / "runbooks/static-page.md"
 PAGE_SCRIPT = PAGE_REVIEW_SKILL / "scripts/check_page.py"
 PAGE_REVIEW_COMMAND = f"python3 -I {PAGE_SCRIPT.as_posix()}"
 PAGE_CHECK_PASSED = "Static page checks passed."
@@ -153,8 +154,9 @@ async def _run_workshop_agent(name, payload, schema, workspace, run_agent, cance
     tools = ["StructuredOutput"]
     allowed_tools = ["StructuredOutput"]
     if page_review:
-        tools.extend(("Skill", "Bash"))
-        allowed_tools.extend((PAGE_SKILL_PERMISSION, f"Bash({PAGE_REVIEW_COMMAND})"))
+        tools.extend(("Skill", "Read", "Bash"))
+        allowed_tools.extend((PAGE_SKILL_PERMISSION, f"Read(./{PAGE_RUNBOOK.as_posix()})",
+                              f"Bash({PAGE_REVIEW_COMMAND})"))
     spec = AgentSpec(
         prompt=json.dumps(payload, ensure_ascii=False), agent=name, tools=tools,
         allowed_tools=allowed_tools, json_schema=schema, cwd=workspace, timeout=timeout,

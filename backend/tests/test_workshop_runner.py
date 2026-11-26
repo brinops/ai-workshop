@@ -64,8 +64,13 @@ args = sys.argv[1:]
 assert args[args.index('--agent') + 1] == 'workshop-triage'
 assert 'Ukrainian' in args[args.index('--append-system-prompt') + 1]
 assert 'Read(./demo/booking/service.py)' in args and 'Read' not in args
+assert 'Read(./.claude/skills/workshop-tone-of-voice/runbooks/*.md)' in args
 assert Path('.claude/agents/workshop-investigation.md').is_file()
 assert Path('.claude/skills/workshop-tone-of-voice/SKILL.md').is_file()
+tone = Path('.claude/skills/workshop-tone-of-voice')
+assert 'runbooks/approval.md' in (tone / 'SKILL.md').read_text()
+assert 'Попросити правки' in (tone / 'runbooks/approval.md').read_text()
+assert 'Потрібні деталі' in (tone / 'runbooks/clarification.md').read_text()
 assert not Path('.claude/agents/k8s-remediator.md').exists()
 assert not Path('.claude/skills/k8s-failure-analysis').exists()
 assert not Path('.claude/hooks/register_pr.py').exists()
